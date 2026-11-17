@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#19163b">
+  <meta name="description" content="BomberCraft is a voxel arena game for up to eight players. Set the fuse and be the last player standing.">
+  <link rel="icon" href="./assets/tnt.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./style.css">
+  <title>BomberCraft</title>
+</head>
+<body>
+  <div class="cabinet">
+    <header class="topbar">
+      <button class="brand" type="button" data-leave aria-label="BomberCraft home">
+        <img src="./assets/tnt.svg" alt="" width="28" height="28">
+        <span>BOMBER<span>CRAFT</span></span>
+      </button>
+      <div id="round-clock" class="round-clock" hidden>
+        <span id="round-label">ROUND 1</span><time id="timer">02:00</time>
+      </div>
+      <div class="top-actions">
+        <button class="top-button" type="button" data-skin>Player skin</button>
+        <button class="top-button" type="button" data-help>Controls</button>
+        <button class="top-button sound-button" type="button" data-sound aria-label="Sound settings">
+          <img src="./assets/sound_icon.svg" alt="" width="20" height="20">
+        </button>
+      </div>
+    </header>
+
+    <main>
+      <section id="home" class="home screen">
+        <div class="marquee">
+          <h1><span>BOMBER</span><span>CRAFT</span></h1>
+          <p>BUILD. BLAST. BRAG!</p>
+          <div class="hero-board" aria-hidden="true">
+            <span class="spark spark-one">✦</span><span class="spark spark-two">✦</span>
+            <span class="spark spark-three">✧</span><span class="spark spark-four">✦</span>
+            <canvas id="preview" width="700" height="435"></canvas>
+          </div>
+        </div>
+        <section class="panel home-panel" aria-labelledby="play-title">
+          <h2 id="play-title">Play BomberCraft</h2>
+          <p class="muted">Create a room or join up to seven friends.</p>
+          <form id="room-form">
+            <label for="nickname">Nickname</label>
+            <input id="nickname" name="nickname" maxlength="20" autocomplete="nickname" placeholder="Choose a name">
+            <button class="button gold full" id="create" type="submit" value="create">Create room <span aria-hidden="true">→</span></button>
+            <div class="divider">or join a room</div>
+            <div class="join-row">
+              <input id="code" name="code" aria-label="Room code" maxlength="32" spellcheck="false" autocomplete="off" placeholder="Room code">
+              <button class="button cream" id="join" type="submit" value="join">Join</button>
+            </div>
+          </form>
+          <button class="button violet full practice" id="practice" type="button">Solo practice <span aria-hidden="true">↗</span></button>
+          <details id="connection">
+            <summary>Connection settings</summary>
+            <label for="endpoint">Game server address</label>
+            <input id="endpoint" type="url" spellcheck="false" autocomplete="off">
+          </details>
+          <p id="status" class="form-status" role="status" hidden></p>
+          <button class="button cream full" id="cancel" type="button" hidden>Cancel</button>
+        </section>
+      </section>
+
+      <section id="lobby" class="screen centered" hidden>
+        <div class="panel lobby-panel">
+          <div class="panel-header"><h1>Party lobby</h1><button class="button cream small" type="button" data-leave>Leave</button></div>
+          <label for="room-code">Room code</label>
+          <div class="join-row">
+            <input id="room-code" readonly>
+            <button class="button violet" type="button" id="copy-code">Copy</button>
+          </div>
+          <p id="player-count" class="eyebrow"></p>
+          <ul id="slots" class="slots"></ul>
+          <p id="lobby-hint" class="muted" role="status"></p>
+          <div class="lobby-actions">
+            <button class="button green" type="button" id="ready">Ready up</button>
+            <button class="button gold" type="button" id="start">Start game</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="game" class="screen game" aria-label="Arena" hidden>
+        <div class="game-heading">
+          <p id="game-mode" class="eyebrow"></p>
+          <button class="top-button" type="button" data-leave>Exit</button>
+        </div>
+        <div class="arena-shell">
+          <canvas id="arena" tabindex="-1" width="960" height="600" aria-label="BomberCraft arena"></canvas>
+          <div id="round-notice" class="round-notice" role="status" hidden></div>
+        </div>
+        <div class="game-footer">
+          <div class="upgrades" aria-label="Power-ups">
+            <span><img src="./assets/powerup_fire.svg" alt="Blast radius" title="Blast radius"> <b id="fire">1</b></span>
+            <span><img src="./assets/powerup_bomb.svg" alt="Bomb capacity" title="Bomb capacity"> <b id="bombs">1</b></span>
+            <span><img src="./assets/powerup_skate.svg" alt="Speed level" title="Speed level"> <b id="speed">0</b></span>
+          </div>
+          <p id="game-hint" class="keyboard-hint">WASD / Arrows to move · Space for TNT</p>
+        </div>
+        <div class="touch-controls" aria-label="Touch controls">
+          <div class="dpad">
+            <button type="button" data-dir="3" class="up" aria-label="Move up">▲</button>
+            <button type="button" data-dir="1" class="left" aria-label="Move left">◀</button>
+            <button type="button" data-dir="2" class="down" aria-label="Move down">▼</button>
+            <button type="button" data-dir="0" class="right" aria-label="Move right">▶</button>
+          </div>
+          <button type="button" class="button gold touch-tnt" id="touch-tnt">TNT</button>
+        </div>
+      </section>
+
+      <section id="results" class="screen centered" hidden>
+        <div class="panel results-panel">
+          <div class="panel-header"><h1 id="results-title"></h1><button class="button cream small" type="button" data-leave>Exit</button></div>
+          <div class="podium">
+            <div id="hero-trophy" class="hero-trophy" aria-hidden="true"></div>
+            <h2 id="winner"></h2><p id="result-summary"></p>
+          </div>
+          <ol id="standings" class="standings"></ol>
+          <p class="results-countdown" id="results-countdown"></p>
+          <button class="button gold full" type="button" id="retry" hidden>Practice again</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="help-dialog" class="panel">
+    <form method="dialog">
+      <div class="panel-header"><h2>Controls</h2><button class="button cream small" aria-label="Close controls">Close</button></div>
+      <dl class="controls-list"><div><dt>Move</dt><dd>WASD / Arrow keys</dd></div><div><dt>Place or throw TNT</dt><dd>Space</dd></div></dl>
+      <p>After elimination, steer your boat along the outer wall and throw TNT back into the arena. Boats leave when sudden death begins.</p>
+      <p class="muted">The round continues while this window is open.</p>
+    </form>
+  </dialog>
+  <dialog id="sound-dialog" class="panel">
+    <form method="dialog">
+      <div class="panel-header"><h2>Sound</h2><button class="button cream small" aria-label="Close sound settings">Done</button></div>
+      <label class="volume"><span>Music</span><input id="music" type="range" min="0" max="100" value="35"></label>
+      <label class="volume"><span>Effects</span><input id="effects" type="range" min="0" max="100" value="65"></label>
+      <label class="mute"><input id="muted" type="checkbox"> Mute all sound</label>
+    </form>
+  </dialog>
+  <dialog id="skin-dialog" class="panel" aria-labelledby="skin-title">
+    <form method="dialog">
+      <div class="panel-header"><h2 id="skin-title">Player skin</h2><button class="button cream small" aria-label="Close player skin">Done</button></div>
+      <div class="skin-layout">
+        <section aria-label="3D player preview">
+          <canvas class="player-viewer" width="480" height="380" tabindex="0" aria-label="Rotatable player model" aria-describedby="player-viewer-help"></canvas>
+          <p id="player-viewer-help" class="muted viewer-help">Drag or use arrow keys to rotate. Scroll or use the slider to zoom.</p>
+          <div class="viewer-controls">
+            <label class="viewer-zoom"><span>Zoom</span><input type="range" min="70" max="160" value="100" step="5" data-viewer-zoom></label>
+            <button class="button cream small" type="button" data-viewer-reset>Reset view</button>
+          </div>
+        </section>
+        <section class="skin-sheet" aria-label="PNG texture">
+          <h3>PNG texture</h3>
+          <canvas class="skin-preview" width="64" height="32" aria-label="Player skin texture"></canvas>
+          <p>Exports use BomberCraft’s 64 × 32 format. Keep the four marked pixels intact when editing.</p>
+          <div class="skin-actions">
+            <button class="button violet" type="button" data-import-skin="bombercraft">Import PNG</button>
+            <button class="button gold" type="button" data-export-skin>Export PNG</button>
+          </div>
+          <div class="skin-actions skin-actions-secondary">
+            <button class="button violet" type="button" data-import-skin="minecraft">Import Minecraft Skin</button>
+            <button class="button cream" type="button" data-reset-skin>Restore default</button>
+          </div>
+          <input type="file" accept="image/png,.png" data-skin-file="bombercraft" aria-label="Select BomberCraft skin PNG" hidden>
+          <input type="file" accept="image/png,.png" data-skin-file="minecraft" aria-label="Select Minecraft skin PNG" hidden>
+          <p class="muted" role="status"></p>
+          <p class="muted skin-import-note">Import skins you have permission to use. BomberCraft is independent of Mojang and Microsoft.</p>
+        </section>
+      </div>
+    </form>
+  </dialog>
+  <template id="trophy-template">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M8 8H3v4c0 4 3 6 8 6m13-10h5v4c0 4-3 6-8 6M16 20v6m-6 2h12" fill="none" stroke="currentColor" stroke-width="3"/><path d="M8 4h16v8c0 5-3 9-8 9s-8-4-8-9z" fill="currentColor"/><path d="M11 7h3v8h-3z" fill="#fff1b7"/></svg>
+  </template>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
