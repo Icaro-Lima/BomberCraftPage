@@ -4,6 +4,7 @@ import { resolveExplosion,                     } from "./explosion.js";
 import { applyPowerUp, rollPowerUp, speedMultiplier, startingUpgrades,                                 } from "./powerups.js";
 import { addBlast, borderSpawn, borderThrowTarget, inBlast, isBorderLane } from "./combat.js";
 import { suddenDeathPlan } from "./sudden_death.js";
+import { hasSkinSignature, SKIN_V1_RGBA_BYTES } from "../player-model.js";
 import arena from "./arena.js";
 
 const FUSE_MS = 2400;
@@ -18,6 +19,8 @@ const ARENA_DEPTH = arena.rows.length;
 const BLAST_RANGE = arena.powerUps.startingBlastRadius;
 const BLAST_ACTIVE_MS = 500;
 const SOFT_BLOCK_CLEAR_MS = BLAST_ACTIVE_MS + 13 * (1000 / 60);
+const SKIN_UPDATE_INTERVAL_MS = 500;
+const SKIN_MESSAGE = 13;
 const SPAWN_CLEAR_OFFSETS = [[0, 0], [0, -1], [0, 1], [-1, 0], [1, 0]];
 
                                                                
@@ -36,6 +39,7 @@ const SPAWN_CLEAR_OFFSETS = [[0, 0], [0, -1], [0, 1], [-1, 0], [1, 0]];
               
                    
                  
+                    
                                                                                                                             
   
 
@@ -62,6 +66,8 @@ export class LobbyRoom extends Room {
           activeBlasts = new Map                ();
           tnt = new Map             ();
           players = new Map                ();
+          changedSkins = new Set        ();
+          skinUpdateScheduled = false;
 
   onCreate() {
     this.onMessageBytes(1, (client, bytes) => this.receiveInputs(client, bytes));
@@ -75,6 +81,7 @@ export class LobbyRoom extends Room {
       this.publishLobby();
     });
     this.onMessageBytes(9, (client, bytes) => this.startRound(client, bytes));
+    this.onMessageBytes(SKIN_MESSAGE, (client, bytes) => this.receiveSkin(client, bytes));
     this.setSimulationInterval(delta => this.simulate(delta), INPUT_STEP_MS);
     this.clock.setInterval(() => {
       if (this.playing || this.phase === "ending") this.publish();
@@ -216,6 +223,9 @@ export class LobbyRoom extends Room {
     this.players.set(client.sessionId, { ...startingUpgrades(), slot, name: nickname || `Player ${slot + 1}`, ready: false, trophies: 0, alive: true, invulnerable: false, nextThrowAt: 0, x, z, direction: NO_DIRECTION, ack: 0, received: 0, credit: 0, inputs: [] });
     if (!this.hostId) this.hostId = client.sessionId;
     this.publishLobby();
+    for (const [id, player] of this.players) {
+      if (player.skin) client.sendBytes(SKIN_MESSAGE, this.skinSnapshot(id, player.skin));
+    }
     client.sendBytes(7, this.softBlockSnapshot());
     client.sendBytes(4, this.tntSnapshot());
     client.sendBytes(11, this.powerUpSnapshot());
@@ -227,11 +237,40 @@ export class LobbyRoom extends Room {
     // A disconnect between simulation ticks must not settle the deadline before its impact.
     if (this.roundEndsAt !== null && now >= this.roundEndsAt) this.advanceSuddenDeath(now);
     this.players.delete(client.sessionId);
+    this.changedSkins.delete(client.sessionId);
     this.participants.delete(client.sessionId);
     if (this.hostId === client.sessionId) this.hostId = this.players.keys().next().value ?? "";
     this.evaluateRound(now);
     this.publish();
     this.publishLobby();
+  }
+
+          receiveSkin(client        , bytes            ) {
+    const player = this.players.get(client.sessionId);
+    if (!player) return;
+    if (bytes.length === 0) {
+      if (!player.skin) return;
+      delete player.skin;
+    } else {
+      if (bytes.length !== SKIN_V1_RGBA_BYTES || !hasSkinSignature(bytes)) return;
+      player.skin = new Uint8Array(bytes);
+    }
+    this.changedSkins.add(client.sessionId);
+    if (this.skinUpdateScheduled) return;
+    this.skinUpdateScheduled = true;
+    // Send the latest change per player at most once per interval, separately from movement.
+    this.clock.setTimeout(() => {
+      this.skinUpdateScheduled = false;
+      for (const id of this.changedSkins) {
+        const current = this.players.get(id);
+        if (current) this.broadcast(SKIN_MESSAGE, this.skinSnapshot(id, current.skin));
+      }
+      this.changedSkins.clear();
+    }, SKIN_UPDATE_INTERVAL_MS);
+  }
+
+          skinSnapshot(id        , skin             ) {
+    return Buffer.from(JSON.stringify({ id, pixels: skin ? btoa(String.fromCharCode(...skin)) : null }));
   }
 
           receiveInputs(client        , bytes            ) {
@@ -507,7 +546,8 @@ export class LobbyRoom extends Room {
     const players = Array.from(this.players, ([id, { slot, name, ready }]) => ({ id, slot, name, ready }));
     this.broadcast(10, Buffer.from(JSON.stringify({
       roomId: this.roomId, hostId: this.hostId, playing: this.playing, phase: this.phase, roundId: this.roundId, roundNumber: this.roundNumber,
-      roundEndsAt: this.roundEndsAt, suddenDeath: this.suddenDeath, results: this.results, players, turnWithHeldDirections: true,
+      roundEndsAt: this.roundEndsAt, suddenDeath: this.suddenDeath, results: this.results, players,
+      turnWithHeldDirections: true, playerSkins: true,
     })));
   }
 

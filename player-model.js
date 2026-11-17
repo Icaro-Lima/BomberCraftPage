@@ -13,6 +13,12 @@ export const SKIN_V1 = Object.freeze({
   signatureY: 31,
   signature: Object.freeze([66, 67, 83, 255, 75, 73, 78, 255, 86, 49, 33, 255, 16, 64, 32, 255]),
 });
+export const SKIN_V1_RGBA_BYTES = SKIN_V1.width * SKIN_V1.height * 4;
+
+export function hasSkinSignature(pixels) {
+  const marker = (SKIN_V1.signatureY * SKIN_V1.width + SKIN_V1.signatureX) * 4;
+  return SKIN_V1.signature.every((value, index) => value === pixels[marker + index]);
+}
 
 export function boxFaces([u, v], [width, height, depth]) {
   return {

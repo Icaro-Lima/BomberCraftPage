@@ -1,4 +1,4 @@
-import { PLAYER_PARTS, playerColors, SKIN_V1 } from "./player-model.js";
+import { hasSkinSignature, PLAYER_PARTS, playerColors, SKIN_V1, SKIN_V1_RGBA_BYTES } from "./player-model.js";
 import { wirePlayerViewer } from "./player-viewer.js";
 import { convertMinecraftSkin, minecraftSkinLayout } from "./minecraft-skin.js";
 
@@ -75,6 +75,22 @@ function splitFaces(sheet) {
   ]));
 }
 
+export function roomSkinFaces(encoded) {
+  if (typeof encoded !== "string" || encoded.length !== Math.ceil(SKIN_V1_RGBA_BYTES / 3) * 4) return;
+  let bytes;
+  try {
+    bytes = atob(encoded);
+  } catch {
+    return;
+  }
+  if (bytes.length !== SKIN_V1_RGBA_BYTES) return;
+  const pixels = Uint8ClampedArray.from(bytes, (byte) => byte.charCodeAt(0));
+  if (!hasSkinSignature(pixels)) return;
+  const sheet = makeCanvas(SKIN_V1.width, SKIN_V1.height);
+  sheet.getContext("2d").putImageData(new ImageData(pixels, sheet.width, sheet.height), 0, 0);
+  return splitFaces(sheet);
+}
+
 const defaultSkins = playerColors.map((shirt) => {
   const sheet = makeDefaultSheet(shirt);
   return { sheet, faces: splitFaces(sheet) };
@@ -119,17 +135,15 @@ async function decodeSkin(file, format = "bombercraft") {
   } finally {
     bitmap.close();
   }
-  if (nativeSize) {
-    const signature = ctx.getImageData(SKIN_V1.signatureX, SKIN_V1.signatureY, 4, 1).data;
-    if (SKIN_V1.signature.every((value, index) => value === signature[index])) {
-      return { file, sheet: source, faces: splitFaces(source) };
-    }
+  const image = ctx.getImageData(0, 0, width, height);
+  if (nativeSize && hasSkinSignature(image.data)) {
+    return { file, sheet: source, faces: splitFaces(source) };
   }
   if (format === "bombercraft") {
     throw new Error("The BomberCraft v1 marker is missing. For a legacy Minecraft PNG, use Import Minecraft Skin.");
   }
 
-  const pixels = convertMinecraftSkin(ctx.getImageData(0, 0, width, height));
+  const pixels = convertMinecraftSkin(image);
   const sheet = makeCanvas(SKIN_V1.width, SKIN_V1.height);
   sheet.getContext("2d").putImageData(new ImageData(pixels, sheet.width, sheet.height), 0, 0);
   const converted = await canvasPng(sheet);
@@ -168,7 +182,7 @@ export function wirePlayerSkin(dialog, onChange) {
     ctx.drawImage(displayedSkin.sheet, 0, 0);
     updateViewer(displayedSkin.faces);
     resetButton.disabled = !skin;
-    onChange(skin?.faces);
+    onChange(skin);
   }
 
   showSkin();

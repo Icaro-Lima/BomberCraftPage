@@ -1,6 +1,6 @@
 export const Message = Object.freeze({
   input: 1, players: 2, bombs: 4, blast: 5, clock: 6, crates: 7,
-  ready: 8, start: 9, lobby: 10, pickups: 11, death: 12,
+  ready: 8, start: 9, lobby: 10, pickups: 11, death: 12, skin: 13,
 });
 
 const JOIN = 10;

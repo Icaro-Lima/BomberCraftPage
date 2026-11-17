@@ -3,7 +3,7 @@ import { inputPayload, Message, openParty } from "./connection.js";
 import { openPractice } from "./practice-room.js";
 import { CRATE_DEBRIS_MS, makePreview, makeRenderer } from "./renderer.js";
 import { playerColors } from "./player-model.js";
-import { wirePlayerSkin } from "./player-skin.js";
+import { roomSkinFaces, wirePlayerSkin } from "./player-skin.js";
 import arena from "./rules/arena.js";
 import { isBorderLane } from "./rules/combat.js";
 import { INPUT_STEP_MS, movePlayer, NO_DIRECTION } from "./rules/movement.js";
@@ -58,10 +58,12 @@ const pressed = new Map();
 const fuseTicks = new Map();
 
 let localSkin;
+const remoteSkins = new Map();
 const updatePreviewSkin = makePreview($("preview"));
 wirePlayerSkin(skinSettings, (skin) => {
   localSkin = skin;
-  updatePreviewSkin(skin);
+  updatePreviewSkin(skin?.faces);
+  shareSkin();
 });
 wireAudio({ music: $("music"), effects: $("effects"), muted: $("muted") });
 setMusic("menu");
@@ -125,6 +127,7 @@ function leave(reason = "") {
   room = null;
   old?.close();
   lobby = null;
+  remoteSkins.clear();
   resetRound(0);
   setBusy(false);
   showScreen("home");
@@ -169,10 +172,21 @@ async function connect(mode) {
   }
 }
 
+function shareSkin() {
+  if (!room || practice || !lobby?.playerSkins) return;
+  const sheet = localSkin?.sheet;
+  const pixels = sheet?.getContext("2d").getImageData(0, 0, sheet.width, sheet.height).data;
+  room.send(Message.skin, pixels);
+}
+
 function updateLobby(state) {
   const previous = lobby;
   if (state.roundId !== epoch) resetRound(state.roundId);
   lobby = state;
+  if (state.playerSkins && !previous?.playerSkins && localSkin) shareSkin();
+  for (const id of remoteSkins.keys()) {
+    if (!state.players.some((player) => player.id === id)) remoteSkins.delete(id);
+  }
   if (state.phase === "lobby") {
     if (practice) {
       if (previous && previous.phase !== "lobby") leave();
@@ -300,6 +314,15 @@ function onMessage(type, data) {
     case Message.players:
       if (screen === "game") updatePlayers(data);
       break;
+    case Message.skin: {
+      if (!data || data.id === room.sessionId || !lobby?.players.some(({ id }) => id === data.id)) break;
+      if (data.pixels === null) remoteSkins.delete(data.id);
+      else {
+        const skin = roomSkinFaces(data.pixels);
+        if (skin) remoteSkins.set(data.id, skin);
+      }
+      break;
+    }
     case Message.crates: {
       const next = tileMap(data);
       // Keep the break effect after the server removes the blocking tile.
@@ -398,12 +421,13 @@ function remotePlayers(now) {
   for (const history of tracks.values()) {
     while (history.length > 1 && history[1].time <= renderAt) history.shift();
     const [a, b] = history;
+    const skin = remoteSkins.get(a.id);
     if (!b || renderAt <= a.time) {
-      players.push(a);
+      players.push({ ...a, skin });
       continue;
     }
     const fraction = Math.min(1, (renderAt - a.time) / (b.time - a.time));
-    players.push({ ...b, x: a.x + (b.x - a.x) * fraction, z: a.z + (b.z - a.z) * fraction });
+    players.push({ ...b, skin, x: a.x + (b.x - a.x) * fraction, z: a.z + (b.z - a.z) * fraction });
   }
   return players;
 }
@@ -535,7 +559,7 @@ function updateArena(now, elapsed) {
     crateDebris.push(crate);
   }
   const players = remotePlayers(now);
-  if (local) players.push({ ...local, skin: localSkin });
+  if (local) players.push({ ...local, skin: localSkin?.faces });
   render({
     self: room.sessionId,
     players: players.filter((player) => player.alive || (playing && !hurry)),
