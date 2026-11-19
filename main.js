@@ -3,7 +3,8 @@ import { inputPayload, Message, openParty } from "./connection.js";
 import { openPractice } from "./practice-room.js";
 import { CRATE_DEBRIS_MS, makePreview, makeRenderer } from "./renderer.js";
 import { playerColors } from "./player-model.js";
-import { roomSkinFaces, wirePlayerSkin } from "./player-skin.js";
+import { defaultSkin, roomSkinFaces, wirePlayerSkin } from "./player-skin.js";
+import { wireJoystick } from "./touch-joystick.js";
 import arena from "./rules/arena.js";
 import { isBorderLane } from "./rules/combat.js";
 import { INPUT_STEP_MS, movePlayer, NO_DIRECTION } from "./rules/movement.js";
@@ -56,6 +57,7 @@ let accumulator = 0;
 let lastTimerSecond = -1;
 const pressed = new Map();
 const fuseTicks = new Map();
+let resetJoystick;
 
 let localSkin;
 const remoteSkins = new Map();
@@ -64,6 +66,7 @@ wirePlayerSkin(skinSettings, (skin) => {
   localSkin = skin;
   updatePreviewSkin(skin?.faces);
   shareSkin();
+  refreshPortraits();
 });
 wireAudio({ music: $("music"), effects: $("effects"), muted: $("muted") });
 setMusic("menu");
@@ -224,7 +227,11 @@ function updateLobby(state) {
       effect(winnerId ? (winnerId === room.sessionId ? "win" : "round_lost") : "draw");
       clearControls();
       const winner = state.results.standings.find(({ id }) => id === state.results.winnerId);
-      text("round-notice", winner ? `${winner.name} wins!` : practice ? "Practice complete" : "Round draw");
+      if (winner) {
+        $("round-notice").replaceChildren(playerPortrait(winner), document.createTextNode(`${winner.name} wins!`));
+      } else {
+        text("round-notice", practice ? "Practice complete" : "Round draw");
+      }
       $("round-notice").hidden = false;
     }
     return;
@@ -239,6 +246,32 @@ function updateLobby(state) {
       showResults(state.results);
     }
   }
+}
+
+function drawPortrait(canvas) {
+  const { playerId, slot } = canvas.dataset;
+  const faces = playerId === room?.sessionId ? localSkin?.faces : remoteSkins.get(playerId);
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage((faces ?? defaultSkin(Number(slot)).faces).head.front, 0, 0);
+}
+
+function playerPortrait(player, large = false) {
+  const canvas = document.createElement("canvas");
+  canvas.className = `avatar-face${large ? " avatar-face-large" : ""}`;
+  const face = defaultSkin(player.slot).faces.head.front;
+  canvas.width = face.width;
+  canvas.height = face.height;
+  canvas.dataset.playerId = player.id;
+  canvas.dataset.slot = player.slot;
+  canvas.style.setProperty("--slot", playerColors[player.slot]);
+  canvas.setAttribute("aria-hidden", "true");
+  drawPortrait(canvas);
+  return canvas;
+}
+
+function refreshPortraits() {
+  for (const canvas of document.querySelectorAll(".avatar-face")) drawPortrait(canvas);
 }
 
 function listPlayers(state) {
@@ -259,7 +292,11 @@ function listPlayers(state) {
       entry.id === room.sessionId && "YOU",
       entry.ready ? "READY" : "WAITING",
     ].filter(Boolean).join(" · ") : "\u00a0";
-    item.append(name, tags);
+    const details = document.createElement("div");
+    details.className = "player-details";
+    details.append(name, tags);
+    if (entry) item.append(playerPortrait(entry));
+    item.append(details);
     return item;
   });
   $("slots").replaceChildren(...slots);
@@ -283,12 +320,12 @@ function trophy(filled) {
 
 function showResults(result) {
   const champion = result.championId !== null;
-  const winner = result.standings.find(({ id }) => id === result.winnerId);
+  const winner = result.standings.find(({ id }) => id === (result.championId ?? result.winnerId));
   text("results-title", champion ? "Match champion!" : `Round ${result.roundNumber} results`);
   text("winner", winner ? winner.name : practice ? "Practice complete" : "Draw");
   text("result-summary", winner ? champion ? "Three round wins" : "Round winner"
     : practice ? "Solo practice" : "No trophy this round");
-  $("hero-trophy").replaceChildren(...(winner ? [trophy(true)] : []));
+  $("hero-trophy").replaceChildren(...(winner ? [playerPortrait(winner, true), trophy(true)] : []));
   $("standings").replaceChildren(...result.standings.map((entry) => {
     const row = document.createElement("li");
     const name = document.createElement("strong");
@@ -299,7 +336,7 @@ function showResults(result) {
     trophies.className = "trophies";
     trophies.setAttribute("aria-label", `${entry.trophies} of 3 trophies`);
     for (let index = 0; index < 3; index++) trophies.append(trophy(index < entry.trophies));
-    row.append(name, trophies);
+    row.append(playerPortrait(entry), name, trophies);
     return row;
   }));
   $("retry").hidden = !practice;
@@ -321,6 +358,7 @@ function onMessage(type, data) {
         const skin = roomSkinFaces(data.pixels);
         if (skin) remoteSkins.set(data.id, skin);
       }
+      refreshPortraits();
       break;
     }
     case Message.crates: {
@@ -436,6 +474,7 @@ function clearControls() {
   pressed.clear();
   place = false;
   pendingTurn = undefined;
+  resetJoystick?.();
 }
 
 function pressDirection(key, direction) {
@@ -668,15 +707,12 @@ document.addEventListener("pointerover", (event) => {
   if (button && !button.disabled && !button.contains(event.relatedTarget)) effect("ui_hover", 35);
 });
 
-for (const button of document.querySelectorAll("[data-dir]")) {
-  button.addEventListener("pointerdown", (event) => {
-    if (!activeGame()) return;
-    button.setPointerCapture(event.pointerId);
-    pressDirection(event.pointerId, Number(button.dataset.dir));
-  });
-  for (const name of ["pointerup", "pointercancel", "lostpointercapture"]) {
-    button.addEventListener(name, (event) => releaseDirection(event.pointerId, name !== "pointerup"));
+resetJoystick = wireJoystick($("joystick"), activeGame, (directions) => {
+  for (let direction = 0; direction < 4; direction++) {
+    if (!directions.includes(direction)) releaseDirection(`joystick-${direction}`, true);
   }
-}
+  // Insert the preferred direction last, as with the keyboard's key ordering.
+  for (const direction of [...directions].reverse()) pressDirection(`joystick-${direction}`, direction);
+});
 $("touch-tnt").addEventListener("pointerdown", () => { if (activeGame()) place = true; });
 $("touch-tnt").addEventListener("click", (event) => { if (event.detail === 0 && activeGame()) place = true; });

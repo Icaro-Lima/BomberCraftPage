@@ -113,6 +113,7 @@ export function makeRenderer(canvas, { width = 15, depth = 13, hero = false } = 
   let scale;
   let originX;
   let originY;
+  let arenaPadding;
   const walks = new Map();
 
   function perspective(z, y) {
@@ -478,10 +479,11 @@ export function makeRenderer(canvas, { width = 15, depth = 13, hero = false } = 
     const ratio = Math.min(2, window.devicePixelRatio || 1);
     const pixelWidth = Math.round(viewWidth * ratio);
     const pixelHeight = Math.round(viewHeight * ratio);
-    if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
-      // CSS owns the aspect ratio. Preserve it when changing backing pixels.
+    if (arenaPadding === undefined || canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
+      // CSS owns the viewport dimensions and the space reserved for the HUD.
       canvas.width = pixelWidth;
       canvas.height = pixelHeight;
+      arenaPadding = Number.parseFloat(getComputedStyle(canvas).getPropertyValue("--arena-padding")) || 0;
     }
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     ctx.imageSmoothingEnabled = false;
@@ -491,7 +493,9 @@ export function makeRenderer(canvas, { width = 15, depth = 13, hero = false } = 
       originX = (viewWidth - (centerX + centerZ * skew) * 2 * scale) / 2;
       originY = (viewHeight - centerZ * 2 * pitch * scale) / 2 + scale * 9;
     } else {
-      scale = Math.min(viewWidth / (maxX - minX + halfTile), viewHeight / (maxY - minY + halfTile));
+      const fieldHeight = Math.max(1, viewHeight - 2 * arenaPadding);
+      scale = Math.min(viewWidth / (maxX - minX + halfTile), viewHeight / (maxY - minY + halfTile),
+        fieldHeight / (fieldBottom - fieldTop));
       originX = viewWidth / 2;
       originY = viewHeight / 2 - fieldCenterY * scale;
     }

@@ -16,9 +16,6 @@
         <img src="./assets/tnt.svg" alt="" width="28" height="28">
         <span>BOMBER<span>CRAFT</span></span>
       </button>
-      <div id="round-clock" class="round-clock" hidden>
-        <span id="round-label">ROUND 1</span><time id="timer">02:00</time>
-      </div>
       <div class="top-actions">
         <button class="top-button" type="button" data-skin>Player skin</button>
         <button class="top-button" type="button" data-help>Controls</button>
@@ -82,30 +79,37 @@
       </section>
 
       <section id="game" class="screen game" aria-label="Arena" hidden>
-        <div class="game-heading">
-          <p id="game-mode" class="eyebrow"></p>
-          <button class="top-button" type="button" data-leave>Exit</button>
-        </div>
         <div class="arena-shell">
           <canvas id="arena" tabindex="-1" width="960" height="600" aria-label="BomberCraft arena"></canvas>
+          <div class="arena-toolbar">
+            <p id="game-mode" class="eyebrow arena-mode"></p>
+            <div id="round-clock" class="round-clock" hidden>
+              <span id="round-label">ROUND 1</span><time id="timer">02:00</time>
+            </div>
+            <div class="arena-actions">
+              <button class="top-button" type="button" data-help>Controls</button>
+              <button class="top-button sound-button" type="button" data-sound aria-label="Sound settings">
+                <img src="./assets/sound_icon.svg" alt="" width="20" height="20">
+              </button>
+              <button class="top-button" type="button" data-leave>Exit</button>
+            </div>
+          </div>
           <div id="round-notice" class="round-notice" role="status" hidden></div>
-        </div>
-        <div class="game-footer">
-          <div class="upgrades" aria-label="Power-ups">
-            <span><img src="./assets/powerup_fire.svg" alt="Blast radius" title="Blast radius"> <b id="fire">1</b></span>
-            <span><img src="./assets/powerup_bomb.svg" alt="Bomb capacity" title="Bomb capacity"> <b id="bombs">1</b></span>
-            <span><img src="./assets/powerup_skate.svg" alt="Speed level" title="Speed level"> <b id="speed">0</b></span>
+          <div class="arena-footer">
+            <div class="upgrades" aria-label="Power-ups">
+              <span><img src="./assets/powerup_fire.svg" alt="Blast radius" title="Blast radius"> <b id="fire">1</b></span>
+              <span><img src="./assets/powerup_bomb.svg" alt="Bomb capacity" title="Bomb capacity"> <b id="bombs">1</b></span>
+              <span><img src="./assets/powerup_skate.svg" alt="Speed level" title="Speed level"> <b id="speed">0</b></span>
+            </div>
+            <p id="game-hint" class="keyboard-hint">WASD / Arrows to move · Space for TNT</p>
           </div>
-          <p id="game-hint" class="keyboard-hint">WASD / Arrows to move · Space for TNT</p>
-        </div>
-        <div class="touch-controls" aria-label="Touch controls">
-          <div class="dpad">
-            <button type="button" data-dir="3" class="up" aria-label="Move up">▲</button>
-            <button type="button" data-dir="1" class="left" aria-label="Move left">◀</button>
-            <button type="button" data-dir="2" class="down" aria-label="Move down">▼</button>
-            <button type="button" data-dir="0" class="right" aria-label="Move right">▶</button>
+          <div class="touch-controls" aria-label="Touch controls">
+            <button type="button" id="joystick" class="joystick" aria-label="Movement joystick" aria-describedby="joystick-help">
+              <span class="joystick-thumb" aria-hidden="true"></span>
+            </button>
+            <span id="joystick-help" class="visually-hidden">Drag to move. Release to stop.</span>
+            <button type="button" class="button gold touch-tnt" id="touch-tnt">TNT</button>
           </div>
-          <button type="button" class="button gold touch-tnt" id="touch-tnt">TNT</button>
         </div>
       </section>
 
@@ -127,7 +131,7 @@
   <dialog id="help-dialog" class="panel">
     <form method="dialog">
       <div class="panel-header"><h2>Controls</h2><button class="button cream small" aria-label="Close controls">Close</button></div>
-      <dl class="controls-list"><div><dt>Move</dt><dd>WASD / Arrow keys</dd></div><div><dt>Place or throw TNT</dt><dd>Space</dd></div></dl>
+      <dl class="controls-list"><div><dt>Move</dt><dd><span class="keyboard-instructions">WASD / Arrow keys</span><span class="touch-instructions">Drag the joystick</span></dd></div><div><dt>Place or throw TNT</dt><dd><span class="keyboard-instructions">Space</span><span class="touch-instructions">Tap TNT</span></dd></div></dl>
       <p>After elimination, steer your boat along the outer wall and throw TNT back into the arena. Boats leave when sudden death begins.</p>
       <p class="muted">The round continues while this window is open.</p>
     </form>
