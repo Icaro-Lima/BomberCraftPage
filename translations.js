@@ -44,7 +44,7 @@ export const portuguese = {
   "WASD / Arrows to move · Space for TNT": "WASD / Setas para mover · Espaço para TNT",
   "Touch controls": "Controles de toque",
   "Movement joystick": "Joystick de movimento",
-  "Drag to move. Release to stop.": "Arraste para mover. Solte para parar.",
+  "Touch the lower-left area to set the center. Drag to move. Release to stop.": "Toque na área inferior esquerda para definir o centro. Arraste para mover. Solte para parar.",
   "Match standings": "Classificação da partida",
   "Practice again": "Treinar novamente",
   "Connecting…": "Conectando…",

@@ -877,9 +877,10 @@ resetJoystick = wireJoystick($("joystick"), activeGame, (directions) => {
   }
   // Insert the preferred direction last, as with the keyboard's key ordering.
   for (const direction of [...directions].reverse()) pressDirection(`joystick-${direction}`, direction);
-});
+}, $("joystick-area"));
 for (const name of ["contextmenu", "selectstart"]) {
   document.querySelector(".touch-controls").addEventListener(name, (event) => event.preventDefault());
+  $("joystick-area").addEventListener(name, (event) => event.preventDefault());
 }
 $("touch-tnt").addEventListener("pointerdown", (event) => {
   if (!activeGame() || event.button !== 0) return;

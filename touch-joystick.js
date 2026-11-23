@@ -8,8 +8,9 @@ export function joystickDirections(x, y) {
   return sectors[sector];
 }
 
-export function wireJoystick(element, active, onChange) {
+export function wireJoystick(element, active, onChange, touchArea = element) {
   let pointerId;
+  let origin;
   let held = "";
 
   function change(directions) {
@@ -22,6 +23,9 @@ export function wireJoystick(element, active, onChange) {
   function reset() {
     const previous = pointerId;
     pointerId = undefined;
+    origin = undefined;
+    element.style.setProperty("--stick-origin-x", "0px");
+    element.style.setProperty("--stick-origin-y", "0px");
     element.style.setProperty("--stick-x", "0px");
     element.style.setProperty("--stick-y", "0px");
     element.classList.remove("held");
@@ -35,10 +39,9 @@ export function wireJoystick(element, active, onChange) {
       reset();
       return;
     }
-    const rect = element.getBoundingClientRect();
-    const radius = Math.min(rect.width, rect.height) / 2;
-    const x = (event.clientX - rect.left - rect.width / 2) / radius;
-    const y = (event.clientY - rect.top - rect.height / 2) / radius;
+    const { x: centerX, y: centerY, radius } = origin;
+    const x = (event.clientX - centerX) / radius;
+    const y = (event.clientY - centerY) / radius;
     const length = Math.max(1, Math.hypot(x, y));
     const travel = radius * 0.55;
     element.style.setProperty("--stick-x", `${x / length * travel}px`);
@@ -46,14 +49,20 @@ export function wireJoystick(element, active, onChange) {
     change(joystickDirections(x, y));
   }
 
-  element.addEventListener("pointerdown", (event) => {
+  function start(event) {
     if (!active() || pointerId !== undefined || event.button !== 0) return;
     event.preventDefault();
+    const rect = element.getBoundingClientRect();
+    origin = { x: event.clientX, y: event.clientY, radius: Math.min(rect.width, rect.height) / 2 };
+    element.style.setProperty("--stick-origin-x", `${origin.x - rect.left - rect.width / 2}px`);
+    element.style.setProperty("--stick-origin-y", `${origin.y - rect.top - rect.height / 2}px`);
     pointerId = event.pointerId;
     element.setPointerCapture(pointerId);
     element.classList.add("held");
     move(event);
-  });
+  }
+  element.addEventListener("pointerdown", start);
+  if (touchArea !== element) touchArea.addEventListener("pointerdown", start);
   element.addEventListener("pointermove", move);
   for (const name of ["pointerup", "pointercancel", "lostpointercapture"]) {
     element.addEventListener(name, (event) => { if (event.pointerId === pointerId) reset(); });

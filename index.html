@@ -93,6 +93,7 @@
       <section id="game" class="screen game" aria-label="Arena" hidden data-i18n-aria-label="Arena">
         <div class="arena-shell">
           <canvas id="arena" tabindex="-1" width="960" height="600" aria-label="BomberCraft arena" data-i18n-aria-label="BomberCraft arena"></canvas>
+          <div id="joystick-area" class="joystick-area" aria-hidden="true"></div>
           <div class="arena-toolbar">
             <div class="arena-info">
               <p class="fps-indicator" aria-label="Performance and connection" aria-describedby="fps-description" title="FPS is the measured frame rate. Max is an uncapped estimate from CPU drawing time. Ping is the latest server round-trip time in milliseconds; solo practice is local." data-i18n-aria-label="Performance and connection" data-i18n-title="FPS is the measured frame rate. Max is an uncapped estimate from CPU drawing time. Ping is the latest server round-trip time in milliseconds; solo practice is local.">
@@ -125,7 +126,7 @@
             <button type="button" id="joystick" class="joystick" aria-label="Movement joystick" aria-describedby="joystick-help" data-i18n-aria-label="Movement joystick">
               <span class="joystick-thumb" aria-hidden="true"></span>
             </button>
-            <span id="joystick-help" class="visually-hidden" data-i18n="Drag to move. Release to stop.">Drag to move. Release to stop.</span>
+            <span id="joystick-help" class="visually-hidden" data-i18n="Touch the lower-left area to set the center. Drag to move. Release to stop.">Touch the lower-left area to set the center. Drag to move. Release to stop.</span>
             <button type="button" class="button gold touch-tnt" id="touch-tnt">TNT</button>
           </div>
         </div>
