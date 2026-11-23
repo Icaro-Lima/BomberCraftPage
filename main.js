@@ -82,7 +82,7 @@ wirePlayerSkin(skinSettings, (skin) => {
   shareSkin();
   refreshPortraits();
 });
-wireAudio({ music: $("music"), effects: $("effects"), muted: $("muted") });
+wireAudio({ music: $("music"), effects: $("effects"), muted: $("muted") }, { autoplay: isNativeApp });
 setMusic("menu");
 
 function showScreen(next) {
@@ -862,11 +862,13 @@ document.addEventListener("visibilitychange", () => {
 });
 document.addEventListener("pointerdown", unlockAudio);
 document.addEventListener("click", (event) => {
-  if (!event.target.closest("button")) return;
+  const button = event.target.closest("button");
+  if (!button || button.matches(":disabled, #joystick, #touch-tnt")) return;
   unlockAudio();
   effect("ui_click", 30);
 }, true);
 document.addEventListener("pointerover", (event) => {
+  if (event.pointerType !== "mouse") return;
   const button = event.target.closest("button");
   if (button && !button.disabled && !button.contains(event.relatedTarget)) effect("ui_hover", 35);
 });
@@ -886,5 +888,10 @@ $("touch-tnt").addEventListener("pointerdown", (event) => {
   if (!activeGame() || event.button !== 0) return;
   event.preventDefault();
   place = true;
+  effect("ui_click", 30);
 });
-$("touch-tnt").addEventListener("click", (event) => { if (event.detail === 0 && activeGame()) place = true; });
+$("touch-tnt").addEventListener("click", (event) => {
+  if (event.detail !== 0 || !activeGame()) return;
+  place = true;
+  effect("ui_click", 30);
+});

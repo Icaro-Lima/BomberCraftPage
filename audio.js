@@ -26,13 +26,15 @@ let musicBus;
 let effectsBus;
 let duck;
 let ready = false;
-let resuming = false;
+let resuming;
 let appActive = true;
 let desiredTrack = "";
 let musicRequest = 0;
 let musicVoice;
 let musicLoadFailed = false;
+let preloading = false;
 const samples = new Map();
+const decodedSamples = new Map();
 const voices = new Set();
 const lastEffect = new Map();
 
@@ -46,7 +48,7 @@ function volume(immediately = false) {
   }
 }
 
-export function wireAudio(fields) {
+export function wireAudio(fields, { autoplay = false } = {}) {
   for (const [key, input] of Object.entries(fields)) {
     if (key === "muted") input.checked = keys.muted;
     else input.value = Math.round(keys[key] * 100);
@@ -58,7 +60,17 @@ export function wireAudio(fields) {
       } catch {}
     });
   }
-  volume();
+  if (!ensureContext()) return;
+  // Decode the menu and short effects before they are needed. Long music
+  // tracks load afterward, one at a time, to avoid competing with feedback.
+  if (!preloading) {
+    preloading = true;
+    void Promise.all([loadSample("menu", "ogg"), ...effects.map((name) => loadSample(name, "wav"))])
+      .then(async () => {
+        for (const track of tracks) if (track !== "menu") await loadSample(track, "ogg");
+      });
+  }
+  if (autoplay) unlockAudio();
 }
 
 function loadSample(name, extension) {
@@ -66,7 +78,10 @@ function loadSample(name, extension) {
     const load = fetch(url(name, extension)).then((response) => {
       if (!response.ok) throw new Error(`Audio unavailable: ${name}`);
       return response.arrayBuffer();
-    }).then((bytes) => context.decodeAudioData(bytes)).catch(() => {
+    }).then((bytes) => context.decodeAudioData(bytes)).then((buffer) => {
+      decodedSamples.set(name, buffer);
+      return buffer;
+    }).catch(() => {
       samples.delete(name);
       return null;
     });
@@ -77,9 +92,9 @@ function loadSample(name, extension) {
 
 function fadeMusic(now) {
   if (!musicVoice) return;
-  const { source, gain, startedAt } = musicVoice;
+  const { source, gain, startedAt, fadeIn } = musicVoice;
   gain.gain.cancelScheduledValues(now);
-  gain.gain.setValueAtTime(clamp((now - startedAt) / musicFade, 0, 1), now);
+  gain.gain.setValueAtTime(clamp((now - startedAt) / fadeIn, 0, 1), now);
   gain.gain.linearRampToValueAtTime(0, now + musicFade);
   source.stop(now + musicFade);
   musicVoice = undefined;
@@ -100,6 +115,7 @@ function syncMusic() {
       return;
     }
     const now = context.currentTime;
+    const fadeIn = musicVoice ? musicFade : .04;
     // The two battle arrangements share a bar grid, so the new layers join mid-phrase.
     const offset = track === "battle_late" && musicVoice?.track === "battle"
       ? (now - musicVoice.startedAt) % buffer.duration : 0;
@@ -110,10 +126,10 @@ function syncMusic() {
     const gain = context.createGain();
     source.connect(gain).connect(musicBus);
     gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(1, now + musicFade);
+    gain.gain.linearRampToValueAtTime(1, now + fadeIn);
     source.onended = () => { source.disconnect(); gain.disconnect(); };
     source.start(now, offset);
-    musicVoice = { source, gain, track, startedAt: now };
+    musicVoice = { source, gain, track, startedAt: now, fadeIn };
   });
 }
 
@@ -124,22 +140,27 @@ export function setMusic(track) {
 }
 
 function startAudio() {
+  if (!appActive) {
+    void context.suspend().catch(() => {});
+    return;
+  }
   if (ready) {
     if (musicLoadFailed) syncMusic();
     return;
   }
   ready = true;
   syncMusic();
-  for (const track of tracks) void loadSample(track, "ogg");
-  for (const name of effects) void loadSample(name, "wav");
 }
 
-export function unlockAudio() {
-  if (!appActive) return;
+function ensureContext() {
   if (!context) {
     const AudioContext = window.AudioContext ?? window.webkitAudioContext;
-    if (!AudioContext) return;
-    context = new AudioContext();
+    if (!AudioContext) return false;
+    try {
+      context = new AudioContext({ latencyHint: "interactive" });
+    } catch {
+      return false;
+    }
     master = context.createGain();
     musicBus = context.createGain();
     effectsBus = context.createGain();
@@ -152,10 +173,14 @@ export function unlockAudio() {
     master.connect(compressor).connect(context.destination);
     volume(true);
   }
+  return true;
+}
+
+export function unlockAudio() {
+  if (!appActive || !ensureContext()) return;
   if (context.state === "running") startAudio();
   else if (!resuming) {
-    resuming = true;
-    void context.resume().then(startAudio).catch(() => {}).finally(() => { resuming = false; });
+    resuming = context.resume().then(startAudio).catch(() => {}).finally(() => { resuming = undefined; });
   }
 }
 
@@ -168,37 +193,46 @@ export function setAudioActive(active) {
 
 export function effect(name, cooldown = 60, pan = 0) {
   const now = performance.now();
-  if (!context || keys.muted || !keys.effects || now - (lastEffect.get(name) ?? -Infinity) < cooldown) return;
+  if (!context || !appActive || keys.muted || !keys.effects || now - (lastEffect.get(name) ?? -Infinity) < cooldown) return;
   lastEffect.set(name, now);
-  void loadSample(name, "wav").then((buffer) => {
-    if (!buffer || context.state !== "running" || keys.muted || !keys.effects || performance.now() - now > 350) return;
-    const source = context.createBufferSource();
-    source.buffer = buffer;
-    const panner = pan && context.createStereoPanner?.();
-    if (panner) {
-      panner.pan.value = clamp(pan, -1, 1);
-      source.connect(panner).connect(effectsBus);
-    } else {
-      source.connect(effectsBus);
-    }
-    if (voices.size >= maxEffectVoices) {
-      const oldest = voices.values().next().value;
-      oldest.stop();
-      voices.delete(oldest);
-    }
-    voices.add(source);
-    source.onended = () => {
-      voices.delete(source);
-      source.disconnect();
-      if (panner) panner.disconnect();
-    };
-    const level = duckLevels[name];
-    if (level !== undefined) {
-      const start = context.currentTime;
-      duck.gain.cancelScheduledValues(start);
-      duck.gain.setTargetAtTime(level, start, .025);
-      duck.gain.setTargetAtTime(1, start + buffer.duration, .16);
-    }
-    source.start();
-  });
+  if (resuming && context.state !== "running") void resuming.then(() => scheduleEffect(name, now, pan));
+  else scheduleEffect(name, now, pan);
+}
+
+function scheduleEffect(name, requestedAt, pan) {
+  const cached = decodedSamples.get(name);
+  if (cached) playEffect(cached, name, requestedAt, pan);
+  else void loadSample(name, "wav").then((buffer) => playEffect(buffer, name, requestedAt, pan));
+}
+
+function playEffect(buffer, name, requestedAt, pan) {
+  if (!buffer || !appActive || context.state !== "running" || keys.muted || !keys.effects || performance.now() - requestedAt > 350) return;
+  const source = context.createBufferSource();
+  source.buffer = buffer;
+  const panner = pan && context.createStereoPanner?.();
+  if (panner) {
+    panner.pan.value = clamp(pan, -1, 1);
+    source.connect(panner).connect(effectsBus);
+  } else {
+    source.connect(effectsBus);
+  }
+  if (voices.size >= maxEffectVoices) {
+    const oldest = voices.values().next().value;
+    oldest.stop();
+    voices.delete(oldest);
+  }
+  voices.add(source);
+  source.onended = () => {
+    voices.delete(source);
+    source.disconnect();
+    if (panner) panner.disconnect();
+  };
+  const level = duckLevels[name];
+  if (level !== undefined) {
+    const start = context.currentTime;
+    duck.gain.cancelScheduledValues(start);
+    duck.gain.setTargetAtTime(level, start, .025);
+    duck.gain.setTargetAtTime(1, start + buffer.duration, .16);
+  }
+  source.start();
 }
