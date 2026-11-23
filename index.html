@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
   <meta name="theme-color" content="#19163b">
-  <meta name="description" content="BomberCraft is a voxel arena game for up to eight players. Set the fuse and be the last player standing.">
+  <meta name="description" content="BomberCraft is a voxel arena game for up to eight players. Set the fuse and be the last player standing." data-i18n-content="BomberCraft is a voxel arena game for up to eight players. Set the fuse and be the last player standing.">
   <link rel="icon" href="./assets/tnt.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./style.css">
   <title>BomberCraft</title>
@@ -12,14 +12,15 @@
 <body>
   <div class="cabinet">
     <header class="topbar">
-      <button class="brand" type="button" data-leave aria-label="BomberCraft home">
+      <button class="brand" type="button" data-leave aria-label="BomberCraft home" data-i18n-aria-label="BomberCraft home">
         <img src="./assets/tnt.svg" alt="" width="28" height="28">
         <span>BOMBER<span>CRAFT</span></span>
       </button>
       <div class="top-actions">
-        <button class="top-button" type="button" data-skin>Player skin</button>
-        <button class="top-button" type="button" data-help>Controls</button>
-        <button class="top-button sound-button" type="button" data-sound aria-label="Sound settings">
+        <button class="top-button language-button" type="button" data-language aria-label="Language" title="Language" data-i18n-aria-label="Language" data-i18n-title="Language"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/></svg></button>
+        <button class="top-button" type="button" data-skin data-i18n="Player skin">Player skin</button>
+        <button class="top-button" type="button" data-help data-i18n="Controls">Controls</button>
+        <button class="top-button sound-button" type="button" data-sound aria-label="Sound settings" data-i18n-aria-label="Sound settings">
           <img src="./assets/sound_icon.svg" alt="" width="20" height="20">
         </button>
       </div>
@@ -29,7 +30,7 @@
       <section id="home" class="home screen">
         <div class="marquee">
           <h1><span>BOMBER</span><span>CRAFT</span></h1>
-          <p>BUILD. BLAST. BRAG!</p>
+          <p data-i18n="BUILD. BLAST. BRAG!">BUILD. BLAST. BRAG!</p>
           <div class="hero-board" aria-hidden="true">
             <span class="spark spark-one">✦</span><span class="spark spark-two">✦</span>
             <span class="spark spark-three">✧</span><span class="spark spark-four">✦</span>
@@ -37,77 +38,94 @@
           </div>
         </div>
         <section class="panel home-panel" aria-labelledby="play-title">
-          <h2 id="play-title">Play BomberCraft</h2>
-          <p class="muted">Create a room or join up to seven friends.</p>
+          <h2 id="play-title" data-i18n="Play BomberCraft">Play BomberCraft</h2>
+          <p class="muted" data-i18n="Create a room or join up to seven friends.">Create a room or join up to seven friends.</p>
           <form id="room-form">
-            <label for="nickname">Nickname</label>
-            <input id="nickname" name="nickname" maxlength="20" autocomplete="nickname" placeholder="Choose a name">
-            <button class="button gold full" id="create" type="submit" value="create">Create room <span aria-hidden="true">→</span></button>
-            <div class="divider">or join a room</div>
+            <label for="nickname" data-i18n="Nickname">Nickname</label>
+            <input id="nickname" name="nickname" maxlength="20" autocomplete="nickname" enterkeyhint="go" placeholder="Choose a name" data-i18n-placeholder="Choose a name">
+            <button class="button gold full" id="create" type="submit" value="create"><span data-i18n="Create room">Create room</span> <svg class="create-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
+            <div class="divider" data-i18n="or join a room">or join a room</div>
             <div class="join-row">
-              <input id="code" name="code" aria-label="Room code" maxlength="32" spellcheck="false" autocomplete="off" placeholder="Room code">
-              <button class="button cream" id="join" type="submit" value="join">Join</button>
+              <input id="code" name="code" aria-label="Room code" maxlength="32" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off" enterkeyhint="go" placeholder="Room code" data-i18n-aria-label="Room code" data-i18n-placeholder="Room code">
+              <button class="button cream" id="join" type="submit" value="join" data-i18n="Join">Join</button>
             </div>
           </form>
-          <button class="button violet full practice" id="practice" type="button">Solo practice <span aria-hidden="true">↗</span></button>
-          <details id="connection">
-            <summary>Connection settings</summary>
-            <label for="endpoint">Game server address</label>
-            <input id="endpoint" type="url" spellcheck="false" autocomplete="off">
-          </details>
-          <p id="status" class="form-status" role="status" hidden></p>
-          <button class="button cream full" id="cancel" type="button" hidden>Cancel</button>
+          <div class="home-options">
+            <button class="button violet full practice" id="practice" type="button" data-i18n="Solo practice">Solo practice</button>
+            <button class="button cream" id="connection" type="button" data-connection aria-haspopup="dialog" data-i18n="Connection settings">Connection settings</button>
+          </div>
         </section>
       </section>
 
       <section id="lobby" class="screen centered" hidden>
         <div class="panel lobby-panel">
-          <div class="panel-header"><h1>Party lobby</h1><button class="button cream small" type="button" data-leave>Leave</button></div>
-          <label for="room-code">Room code</label>
-          <div class="join-row">
-            <input id="room-code" readonly>
-            <button class="button violet" type="button" id="copy-code">Copy</button>
+          <div class="panel-header lobby-header">
+            <h1 data-i18n="Party lobby">Party lobby</h1>
+            <button class="lobby-code" type="button" id="copy-code" title="Copy party code" data-i18n-title="Copy party code">
+              <span id="party-code-label" data-i18n="Party code:">Party code:</span> <strong id="room-code"></strong>
+            </button>
+            <span id="code-copy-status" class="visually-hidden" role="status"></span>
+            <div class="lobby-header-actions">
+              <button class="button violet" type="button" data-skin data-i18n="Player skin">Player skin</button>
+              <button class="button cream" type="button" data-leave data-i18n="Leave">Leave</button>
+            </div>
           </div>
-          <p id="player-count" class="eyebrow"></p>
-          <ul id="slots" class="slots"></ul>
-          <p id="lobby-hint" class="muted" role="status"></p>
-          <div class="lobby-actions">
-            <button class="button green" type="button" id="ready">Ready up</button>
-            <button class="button gold" type="button" id="start">Start game</button>
+          <div class="lobby-content">
+            <section class="lobby-roster" aria-label="Players in this room" data-i18n-aria-label="Players in this room">
+              <div class="roster-heading"><h2 data-i18n="Players">Players</h2><p id="player-count" class="player-count"></p></div>
+              <ul id="slots" class="slots" tabindex="0" aria-label="Player list" data-i18n-aria-label="Player list"></ul>
+            </section>
+          </div>
+          <div class="lobby-footer">
+            <div class="lobby-readiness">
+              <p id="ready-count" class="ready-count"></p>
+              <progress id="ready-progress" value="0" max="1" aria-label="Players ready" data-i18n-aria-label="Players ready"></progress>
+              <p id="lobby-hint" role="status"></p>
+            </div>
+            <div class="lobby-actions">
+              <button class="button violet" type="button" id="ready" aria-pressed="false" data-i18n="Ready up">Ready up</button>
+              <button class="button gold" type="button" id="start" data-i18n="Start game">Start game</button>
+            </div>
           </div>
         </div>
       </section>
 
-      <section id="game" class="screen game" aria-label="Arena" hidden>
+      <section id="game" class="screen game" aria-label="Arena" hidden data-i18n-aria-label="Arena">
         <div class="arena-shell">
-          <canvas id="arena" tabindex="-1" width="960" height="600" aria-label="BomberCraft arena"></canvas>
+          <canvas id="arena" tabindex="-1" width="960" height="600" aria-label="BomberCraft arena" data-i18n-aria-label="BomberCraft arena"></canvas>
           <div class="arena-toolbar">
-            <p id="game-mode" class="eyebrow arena-mode"></p>
+            <div class="arena-info">
+              <p class="fps-indicator" aria-label="Performance and connection" aria-describedby="fps-description" title="FPS is the measured frame rate. Max is an uncapped estimate from CPU drawing time. Ping is the latest server round-trip time in milliseconds; solo practice is local." data-i18n-aria-label="Performance and connection" data-i18n-title="FPS is the measured frame rate. Max is an uncapped estimate from CPU drawing time. Ping is the latest server round-trip time in milliseconds; solo practice is local.">
+                <button id="fps-toggle" class="fps-toggle" type="button" aria-label="Show maximum FPS" aria-expanded="false" aria-controls="fps-max" title="Click to show or hide maximum FPS" data-i18n-aria-label="Show maximum FPS" data-i18n-title="Click to show or hide maximum FPS">FPS <b id="fps-current">—</b><span id="fps-max" hidden> (<span data-i18n="max">max</span> <b id="fps-capacity">—</b>)</span></button>
+                <span>Ping <b id="ping">—</b> ms</span>
+              </p>
+              <span id="fps-description" class="visually-hidden" data-i18n="Estimated maximum FPS uses CPU drawing time only. It excludes GPU work, game updates and display refresh limits.">Estimated maximum FPS uses CPU drawing time only. It excludes GPU work, game updates and display refresh limits.</span>
+            </div>
             <div id="round-clock" class="round-clock" hidden>
-              <span id="round-label">ROUND 1</span><time id="timer">02:00</time>
+              <time id="timer">02:00</time>
             </div>
             <div class="arena-actions">
-              <button class="top-button" type="button" data-help>Controls</button>
-              <button class="top-button sound-button" type="button" data-sound aria-label="Sound settings">
+              <button class="top-button" type="button" data-help data-i18n="Controls">Controls</button>
+              <button class="top-button sound-button" type="button" data-sound aria-label="Sound settings" data-i18n-aria-label="Sound settings">
                 <img src="./assets/sound_icon.svg" alt="" width="20" height="20">
               </button>
-              <button class="top-button" type="button" data-leave>Exit</button>
+              <button class="top-button" type="button" data-leave data-i18n="Exit">Exit</button>
             </div>
           </div>
           <div id="round-notice" class="round-notice" role="status" hidden></div>
           <div class="arena-footer">
-            <div class="upgrades" aria-label="Power-ups">
-              <span><img src="./assets/powerup_fire.svg" alt="Blast radius" title="Blast radius"> <b id="fire">1</b></span>
-              <span><img src="./assets/powerup_bomb.svg" alt="Bomb capacity" title="Bomb capacity"> <b id="bombs">1</b></span>
-              <span><img src="./assets/powerup_skate.svg" alt="Speed level" title="Speed level"> <b id="speed">0</b></span>
+            <div class="upgrades" aria-label="Power-ups" data-i18n-aria-label="Power-ups">
+              <span><img src="./assets/powerup_fire.svg" alt="Blast radius" title="Blast radius" data-i18n-alt="Blast radius" data-i18n-title="Blast radius"> <b id="fire">1</b></span>
+              <span><img src="./assets/powerup_bomb.svg" alt="Bomb capacity" title="Bomb capacity" data-i18n-alt="Bomb capacity" data-i18n-title="Bomb capacity"> <b id="bombs">1</b></span>
+              <span><img src="./assets/powerup_skate.svg" alt="Speed level" title="Speed level" data-i18n-alt="Speed level" data-i18n-title="Speed level"> <b id="speed">0</b></span>
             </div>
-            <p id="game-hint" class="keyboard-hint">WASD / Arrows to move · Space for TNT</p>
+            <p id="game-hint" class="keyboard-hint" data-i18n="WASD / Arrows to move · Space for TNT">WASD / Arrows to move · Space for TNT</p>
           </div>
-          <div class="touch-controls" aria-label="Touch controls">
-            <button type="button" id="joystick" class="joystick" aria-label="Movement joystick" aria-describedby="joystick-help">
+          <div class="touch-controls" aria-label="Touch controls" data-i18n-aria-label="Touch controls">
+            <button type="button" id="joystick" class="joystick" aria-label="Movement joystick" aria-describedby="joystick-help" data-i18n-aria-label="Movement joystick">
               <span class="joystick-thumb" aria-hidden="true"></span>
             </button>
-            <span id="joystick-help" class="visually-hidden">Drag to move. Release to stop.</span>
+            <span id="joystick-help" class="visually-hidden" data-i18n="Drag to move. Release to stop.">Drag to move. Release to stop.</span>
             <button type="button" class="button gold touch-tnt" id="touch-tnt">TNT</button>
           </div>
         </div>
@@ -115,63 +133,103 @@
 
       <section id="results" class="screen centered" hidden>
         <div class="panel results-panel">
-          <div class="panel-header"><h1 id="results-title"></h1><button class="button cream small" type="button" data-leave>Exit</button></div>
-          <div class="podium">
-            <div id="hero-trophy" class="hero-trophy" aria-hidden="true"></div>
-            <h2 id="winner"></h2><p id="result-summary"></p>
+          <div class="panel-header"><h1 id="results-title"></h1><button class="button cream small" type="button" data-leave data-i18n="Exit">Exit</button></div>
+          <div class="results-content">
+            <div class="podium">
+              <div id="hero-trophy" class="hero-trophy" aria-hidden="true"></div>
+              <h2 id="winner"></h2><p id="result-summary"></p>
+            </div>
+            <ol id="standings" class="standings" tabindex="0" aria-label="Match standings" data-i18n-aria-label="Match standings"></ol>
           </div>
-          <ol id="standings" class="standings"></ol>
-          <p class="results-countdown" id="results-countdown"></p>
-          <button class="button gold full" type="button" id="retry" hidden>Practice again</button>
+          <div class="results-footer">
+            <p class="results-countdown" id="results-countdown"></p>
+            <button class="button gold" type="button" id="retry" hidden data-i18n="Practice again">Practice again</button>
+          </div>
         </div>
       </section>
     </main>
   </div>
 
+  <dialog id="language-dialog" class="panel" aria-labelledby="language-title">
+    <form method="dialog">
+      <div class="panel-header"><h2 id="language-title" data-i18n="Language">Language</h2><button class="button cream" aria-label="Close language settings" data-i18n="Done" data-i18n-aria-label="Close language settings">Done</button></div>
+      <div class="dialog-body language-settings">
+        <label for="language-select" data-i18n="Language preference">Language preference</label>
+        <select id="language-select">
+          <option value="" data-i18n="Automatic">Automatic</option>
+          <option value="en" lang="en">English</option>
+          <option value="pt-BR" lang="pt-BR">Português (Brasil)</option>
+        </select>
+        <p class="muted" data-i18n="Automatic uses your device or browser language.">Automatic uses your device or browser language.</p>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="connection-status-dialog" class="panel" aria-labelledby="connection-status-title" aria-describedby="status">
+    <form method="dialog">
+      <div class="panel-header"><h2 id="connection-status-title" data-i18n="Connecting…">Connecting…</h2></div>
+      <div class="dialog-body"><p id="status" class="connection-status-message" role="status"></p></div>
+      <div class="connection-status-actions"><button class="button cream" id="cancel" type="button" autofocus data-i18n="Cancel">Cancel</button></div>
+    </form>
+  </dialog>
+  <dialog id="connection-dialog" class="panel" aria-labelledby="connection-title">
+    <form method="dialog">
+      <div class="panel-header"><h2 id="connection-title" data-i18n="Connection settings">Connection settings</h2><button class="button cream" aria-label="Close connection settings" data-i18n="Done" data-i18n-aria-label="Close connection settings">Done</button></div>
+      <div class="dialog-body connection-fields">
+        <p class="muted" data-i18n="Choose the server used to create and join rooms.">Choose the server used to create and join rooms.</p>
+        <label for="endpoint" data-i18n="Game server address">Game server address</label>
+        <input id="endpoint" type="url" spellcheck="false" autocomplete="off" aria-describedby="connection-hint">
+        <p id="connection-hint" class="muted" data-i18n="Use an HTTPS address for online play. Solo practice works offline.">Use an HTTPS address for online play. Solo practice works offline.</p>
+      </div>
+    </form>
+  </dialog>
   <dialog id="help-dialog" class="panel">
     <form method="dialog">
-      <div class="panel-header"><h2>Controls</h2><button class="button cream small" aria-label="Close controls">Close</button></div>
-      <dl class="controls-list"><div><dt>Move</dt><dd><span class="keyboard-instructions">WASD / Arrow keys</span><span class="touch-instructions">Drag the joystick</span></dd></div><div><dt>Place or throw TNT</dt><dd><span class="keyboard-instructions">Space</span><span class="touch-instructions">Tap TNT</span></dd></div></dl>
-      <p>After elimination, steer your boat along the outer wall and throw TNT back into the arena. Boats leave when sudden death begins.</p>
-      <p class="muted">The round continues while this window is open.</p>
+      <div class="panel-header"><h2 data-i18n="Controls">Controls</h2><button class="button cream small" aria-label="Close controls" data-i18n="Close" data-i18n-aria-label="Close controls">Close</button></div>
+      <div class="dialog-body">
+        <dl class="controls-list"><div><dt data-i18n="Move">Move</dt><dd><span class="keyboard-instructions" data-i18n="WASD / Arrow keys">WASD / Arrow keys</span><span class="touch-instructions" data-i18n="Drag the joystick">Drag the joystick</span></dd></div><div><dt data-i18n="Place or throw TNT">Place or throw TNT</dt><dd><span class="keyboard-instructions" data-i18n="Space">Space</span><span class="touch-instructions" data-i18n="Tap TNT">Tap TNT</span></dd></div></dl>
+        <p data-i18n="After elimination, steer your boat along the outer wall and throw TNT back into the arena. Boats leave when sudden death begins.">After elimination, steer your boat along the outer wall and throw TNT back into the arena. Boats leave when sudden death begins.</p>
+        <p class="muted" data-i18n="The round continues while this window is open.">The round continues while this window is open.</p>
+      </div>
     </form>
   </dialog>
   <dialog id="sound-dialog" class="panel">
     <form method="dialog">
-      <div class="panel-header"><h2>Sound</h2><button class="button cream small" aria-label="Close sound settings">Done</button></div>
-      <label class="volume"><span>Music</span><input id="music" type="range" min="0" max="100" value="35"></label>
-      <label class="volume"><span>Effects</span><input id="effects" type="range" min="0" max="100" value="65"></label>
-      <label class="mute"><input id="muted" type="checkbox"> Mute all sound</label>
+      <div class="panel-header"><h2 data-i18n="Sound">Sound</h2><button class="button cream small" aria-label="Close sound settings" data-i18n="Done" data-i18n-aria-label="Close sound settings">Done</button></div>
+      <div class="dialog-body">
+        <label class="volume"><span data-i18n="Music">Music</span><input id="music" type="range" min="0" max="100" value="35"></label>
+        <label class="volume"><span data-i18n="Effects">Effects</span><input id="effects" type="range" min="0" max="100" value="65"></label>
+        <label class="mute"><input id="muted" type="checkbox"> <span data-i18n="Mute all sound">Mute all sound</span></label>
+      </div>
     </form>
   </dialog>
   <dialog id="skin-dialog" class="panel" aria-labelledby="skin-title">
     <form method="dialog">
-      <div class="panel-header"><h2 id="skin-title">Player skin</h2><button class="button cream small" aria-label="Close player skin">Done</button></div>
-      <div class="skin-layout">
-        <section aria-label="3D player preview">
-          <canvas class="player-viewer" width="480" height="380" tabindex="0" aria-label="Rotatable player model" aria-describedby="player-viewer-help"></canvas>
-          <p id="player-viewer-help" class="muted viewer-help">Drag or use arrow keys to rotate. Scroll or use the slider to zoom.</p>
+      <div class="panel-header"><h2 id="skin-title" data-i18n="Player skin">Player skin</h2><button class="button cream small" aria-label="Close player skin" data-i18n="Done" data-i18n-aria-label="Close player skin">Done</button></div>
+      <div class="skin-layout dialog-body">
+        <section aria-label="3D player preview" data-i18n-aria-label="3D player preview">
+          <canvas class="player-viewer" width="480" height="380" tabindex="0" aria-label="Rotatable player model" aria-describedby="player-viewer-help" data-i18n-aria-label="Rotatable player model"></canvas>
+          <p id="player-viewer-help" class="muted viewer-help" data-i18n="Drag or use arrow keys to rotate. Scroll or use the slider to zoom.">Drag or use arrow keys to rotate. Scroll or use the slider to zoom.</p>
           <div class="viewer-controls">
-            <label class="viewer-zoom"><span>Zoom</span><input type="range" min="70" max="160" value="100" step="5" data-viewer-zoom></label>
-            <button class="button cream small" type="button" data-viewer-reset>Reset view</button>
+            <label class="viewer-zoom"><span data-i18n="Zoom">Zoom</span><input type="range" min="70" max="160" value="100" step="5" data-viewer-zoom></label>
+            <button class="button cream small" type="button" data-viewer-reset data-i18n="Reset view">Reset view</button>
           </div>
         </section>
-        <section class="skin-sheet" aria-label="PNG texture">
-          <h3>PNG texture</h3>
-          <canvas class="skin-preview" width="64" height="32" aria-label="Player skin texture"></canvas>
-          <p>Exports use BomberCraft’s 64 × 32 format. Keep the four marked pixels intact when editing.</p>
+        <section class="skin-sheet" aria-label="PNG texture" data-i18n-aria-label="PNG texture">
+          <h3 data-i18n="PNG texture">PNG texture</h3>
+          <canvas class="skin-preview" width="64" height="32" aria-label="Player skin texture" data-i18n-aria-label="Player skin texture"></canvas>
+          <p data-i18n="Exports use BomberCraft’s 64 × 32 format. Keep the four marked pixels intact when editing.">Exports use BomberCraft’s 64 × 32 format. Keep the four marked pixels intact when editing.</p>
           <div class="skin-actions">
-            <button class="button violet" type="button" data-import-skin="bombercraft">Import PNG</button>
-            <button class="button gold" type="button" data-export-skin>Export PNG</button>
+            <button class="button violet" type="button" data-import-skin="bombercraft" data-i18n="Import PNG">Import PNG</button>
+            <button class="button gold" type="button" data-export-skin data-i18n="Export PNG">Export PNG</button>
           </div>
           <div class="skin-actions skin-actions-secondary">
-            <button class="button violet" type="button" data-import-skin="minecraft">Import Minecraft Skin</button>
-            <button class="button cream" type="button" data-reset-skin>Restore default</button>
+            <button class="button violet" type="button" data-import-skin="minecraft" data-i18n="Import Minecraft Skin">Import Minecraft Skin</button>
+            <button class="button cream" type="button" data-reset-skin data-i18n="Restore default">Restore default</button>
           </div>
-          <input type="file" accept="image/png,.png" data-skin-file="bombercraft" aria-label="Select BomberCraft skin PNG" hidden>
-          <input type="file" accept="image/png,.png" data-skin-file="minecraft" aria-label="Select Minecraft skin PNG" hidden>
+          <input type="file" accept="image/png,.png" data-skin-file="bombercraft" aria-label="Select BomberCraft skin PNG" hidden data-i18n-aria-label="Select BomberCraft skin PNG">
+          <input type="file" accept="image/png,.png" data-skin-file="minecraft" aria-label="Select Minecraft skin PNG" hidden data-i18n-aria-label="Select Minecraft skin PNG">
           <p class="muted" role="status"></p>
-          <p class="muted skin-import-note">Import skins you have permission to use. BomberCraft is independent of Mojang and Microsoft.</p>
+          <p class="muted skin-import-note" data-i18n="Import skins you have permission to use. BomberCraft is independent of Mojang and Microsoft.">Import skins you have permission to use. BomberCraft is independent of Mojang and Microsoft.</p>
         </section>
       </div>
     </form>

@@ -14,6 +14,7 @@ const assets = Object.fromEntries([
 // Rasterize SVGs at their native resolution before projecting them onto faces.
 // This also avoids browser-dependent SVG rasterization at a 1 × 1 destination.
 const textures = new Map();
+let textureRevision = 0;
 // Red values in the shared crack mask mark when each branch appears.
 const crackThresholds = [3, 51, 102, 153, 204];
 let crackFrames = [];
@@ -44,6 +45,7 @@ for (const [name, image] of Object.entries(assets)) {
     bitmap.getContext("2d").drawImage(image, 0, 0);
     if (name === "soft_block_cracks") crackFrames = makeCrackFrames(bitmap);
     else textures.set(name, bitmap);
+    textureRevision++;
   }, { once: true });
 }
 
@@ -98,8 +100,8 @@ function splitPolygon(vertices, distance) {
   return [front, back];
 }
 
-export function makeRenderer(canvas, { width = 15, depth = 13, hero = false } = {}) {
-  const ctx = canvas.getContext("2d");
+export function makeRenderer(canvas, { width = 15, depth = 13, hero = false, cacheStatic = true } = {}) {
+  let ctx = canvas.getContext("2d");
   const skew = hero ? .58 : 0;
   const pitch = hero ? .57 : Math.sin(arenaCameraAngle);
   // The home preview angles depth only; front faces keep their pixel proportions.
@@ -114,6 +116,11 @@ export function makeRenderer(canvas, { width = 15, depth = 13, hero = false } = 
   let originX;
   let originY;
   let arenaPadding;
+  let pixelRatio;
+  let lastViewWidth;
+  let lastViewHeight;
+  let cachedTextureRevision = -1;
+  const staticBitmaps = new Map();
   const walks = new Map();
 
   function perspective(z, y) {
@@ -134,8 +141,6 @@ export function makeRenderer(canvas, { width = 15, depth = 13, hero = false } = 
   );
   const minX = Math.min(...corners.map(([x]) => x));
   const maxX = Math.max(...corners.map(([x]) => x));
-  const minY = Math.min(...corners.map(([, y]) => y));
-  const maxY = Math.max(...corners.map(([, y]) => y));
   // Center on the visible field, independent of the room reserved for effects.
   const [, fieldTop] = arenaPoint(centerX, -halfTile, wallSize);
   const [, fieldBottom] = arenaPoint(centerX, boardDepth - halfTile, floorBottom);
@@ -144,6 +149,44 @@ export function makeRenderer(canvas, { width = 15, depth = 13, hero = false } = 
   function point(x, z, y = 0) {
     const [projectedX, projectedY] = hero ? [x + z * skew, z * pitch - y * lift] : arenaPoint(x, z, y);
     return [originX + projectedX * scale, originY + projectedY * scale];
+  }
+
+  function boxBounds(x, z, y, w, d, h) {
+    const points = [x - w / 2, x + w / 2].flatMap((px) =>
+      [z - d / 2, z + d / 2].flatMap((pz) => [y, y + h].map((py) => point(px, pz, py)))
+    );
+    return {
+      left: Math.floor(Math.min(...points.map(([px]) => px)) * pixelRatio) / pixelRatio - 1,
+      top: Math.floor(Math.min(...points.map(([, py]) => py)) * pixelRatio) / pixelRatio - 1,
+      right: Math.ceil(Math.max(...points.map(([px]) => px)) * pixelRatio) / pixelRatio + 1,
+      bottom: Math.ceil(Math.max(...points.map(([, py]) => py)) * pixelRatio) / pixelRatio + 1,
+    };
+  }
+
+  function cachedBox(key, x, z, y, w, d, h, draw) {
+    if (!cacheStatic) {
+      draw();
+      return;
+    }
+    let entry = staticBitmaps.get(key);
+    if (!entry) {
+      const bounds = boxBounds(x, z, y, w, d, h);
+      const bitmap = document.createElement("canvas");
+      bitmap.width = Math.ceil((bounds.right - bounds.left) * pixelRatio);
+      bitmap.height = Math.ceil((bounds.bottom - bounds.top) * pixelRatio);
+      const output = ctx;
+      try {
+        ctx = bitmap.getContext("2d");
+        ctx.setTransform(pixelRatio, 0, 0, pixelRatio, -bounds.left * pixelRatio, -bounds.top * pixelRatio);
+        ctx.imageSmoothingEnabled = false;
+        draw();
+      } finally {
+        ctx = output;
+      }
+      entry = { bitmap, left: bounds.left, top: bounds.top };
+      staticBitmaps.set(key, entry);
+    }
+    ctx.drawImage(entry.bitmap, entry.left, entry.top, entry.bitmap.width / pixelRatio, entry.bitmap.height / pixelRatio);
   }
 
   function trace(points) {
@@ -249,7 +292,10 @@ export function makeRenderer(canvas, { width = 15, depth = 13, hero = false } = 
 
   function drawWall({ x, z, y = 0 }) {
     const texture = textures.get("hard_block");
-    cube(x * TILE_PIXELS, z * TILE_PIXELS, y, wallSize, ["#b7d6ff", "#869fd8", "#627bcb"], [texture, texture]);
+    const draw = () => cube(x * TILE_PIXELS, z * TILE_PIXELS, y, wallSize, ["#b7d6ff", "#869fd8", "#627bcb"], [texture, texture]);
+    // Falling walls remain dynamic; grounded walls keep their exact projection.
+    if (y !== 0) draw();
+    else cachedBox(`wall:${x},${z}`, x * TILE_PIXELS, z * TILE_PIXELS, 0, wallSize, wallSize, wallSize, draw);
   }
 
   function drawCrate({ x, z, hitAt, destroyAt }, now) {
@@ -258,7 +304,10 @@ export function makeRenderer(canvas, { width = 15, depth = 13, hero = false } = 
     const stage = crackThresholds.findLastIndex((threshold) => threshold <= progress * 255);
     const cracks = crackFrames[stage];
     const texture = textures.get("soft_block");
-    cube(x * TILE_PIXELS, z * TILE_PIXELS, 0, crateSize, crateColors, [texture, texture], cracks);
+    const draw = () => cube(x * TILE_PIXELS, z * TILE_PIXELS, 0, crateSize, crateColors, [texture, texture], cracks);
+    // Cracks animate briefly and should not leave a bitmap for every damage stage.
+    if (hitAt !== undefined) draw();
+    else cachedBox(`crate:${x},${z}`, x * TILE_PIXELS, z * TILE_PIXELS, 0, crateSize, crateSize, crateSize, draw);
   }
 
   function addCrateDebris({ x, z, destroyAt }, now, add) {
@@ -479,11 +528,23 @@ export function makeRenderer(canvas, { width = 15, depth = 13, hero = false } = 
     const ratio = Math.min(2, window.devicePixelRatio || 1);
     const pixelWidth = Math.round(viewWidth * ratio);
     const pixelHeight = Math.round(viewHeight * ratio);
+    if (viewWidth !== lastViewWidth || viewHeight !== lastViewHeight || pixelRatio !== ratio || cachedTextureRevision !== textureRevision) {
+      staticBitmaps.clear();
+      lastViewWidth = viewWidth;
+      lastViewHeight = viewHeight;
+      pixelRatio = ratio;
+      cachedTextureRevision = textureRevision;
+    }
     if (arenaPadding === undefined || canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
       // CSS owns the viewport dimensions and the space reserved for the HUD.
       canvas.width = pixelWidth;
       canvas.height = pixelHeight;
-      arenaPadding = Number.parseFloat(getComputedStyle(canvas).getPropertyValue("--arena-padding")) || 0;
+      const style = getComputedStyle(canvas);
+      arenaPadding = {
+        top: Number.parseFloat(style.getPropertyValue("--arena-padding-top")) || 0,
+        bottom: Number.parseFloat(style.getPropertyValue("--arena-padding-bottom")) || 0,
+        inline: Number.parseFloat(style.getPropertyValue("--arena-padding-inline")) || 0,
+      };
     }
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     ctx.imageSmoothingEnabled = false;
@@ -493,13 +554,15 @@ export function makeRenderer(canvas, { width = 15, depth = 13, hero = false } = 
       originX = (viewWidth - (centerX + centerZ * skew) * 2 * scale) / 2;
       originY = (viewHeight - centerZ * 2 * pitch * scale) / 2 + scale * 9;
     } else {
-      const fieldHeight = Math.max(1, viewHeight - 2 * arenaPadding);
-      scale = Math.min(viewWidth / (maxX - minX + halfTile), viewHeight / (maxY - minY + halfTile),
-        fieldHeight / (fieldBottom - fieldTop));
+      const fieldHeight = Math.max(1, viewHeight - arenaPadding.top - arenaPadding.bottom);
+      const fieldWidth = Math.max(1, viewWidth - 2 * arenaPadding.inline);
+      scale = Math.min(fieldWidth / (maxX - minX + halfTile), fieldHeight / (fieldBottom - fieldTop));
       originX = viewWidth / 2;
-      originY = viewHeight / 2 - fieldCenterY * scale;
+      originY = arenaPadding.top + fieldHeight / 2 - fieldCenterY * scale;
     }
-    drawFloor();
+    // Cache the floor separately so players and moving objects retain their
+    // existing depth order with the individually cached walls and crates.
+    cachedBox("floor", centerX, centerZ, floorBottom, boardWidth, boardDepth, -floorBottom, drawFloor);
     const activePlayers = new Set(scene.players.map((player) => player.id ?? player.slot));
     for (const key of walks.keys()) if (!activePlayers.has(key)) walks.delete(key);
 

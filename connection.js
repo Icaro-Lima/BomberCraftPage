@@ -55,6 +55,9 @@ export async function openParty(endpoint, code, nickname, signal, onMessage, onD
     reservation = await response.json();
     if (!response.ok || reservation.error) {
       const error = reservation.error || "Could not create or join the room.";
+      if (/no rooms found|not found|does not exist/i.test(error)) {
+        throw new Error("Room not found. Check the code and try again.");
+      }
       throw new Error(error.endsWith(" is locked") ? "This room is full or a match is already in progress." : error);
     }
   } catch (error) {
@@ -74,6 +77,7 @@ export async function openParty(endpoint, code, nickname, signal, onMessage, onD
   let clockSent = null;
   let clockOffset = 0;
   let bestRtt = Infinity;
+  let ping = null;
   let clockTimer;
   let handshakeTimer;
   let room;
@@ -108,6 +112,7 @@ export async function openParty(endpoint, code, nickname, signal, onMessage, onD
     room = {
       sessionId,
       now: () => performance.now() + clockOffset,
+      get ping() { return ping; },
       send(type, bytes = new Uint8Array()) {
         if (!joined || closed || socket.readyState !== WebSocket.OPEN) return;
         const packet = new Uint8Array(bytes.length + 2);
@@ -142,6 +147,7 @@ export async function openParty(endpoint, code, nickname, signal, onMessage, onD
         const value = JSON.parse(decoder.decode(packet.subarray(2)));
         if (type === Message.clock && clockSent !== null) {
           const rtt = performance.now() - clockSent;
+          ping = rtt;
           if (rtt <= bestRtt) {
             bestRtt = rtt;
             clockOffset = value - clockSent - rtt / 2;

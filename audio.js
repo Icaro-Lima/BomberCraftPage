@@ -27,6 +27,7 @@ let effectsBus;
 let duck;
 let ready = false;
 let resuming = false;
+let appActive = true;
 let desiredTrack = "";
 let musicRequest = 0;
 let musicVoice;
@@ -134,6 +135,7 @@ function startAudio() {
 }
 
 export function unlockAudio() {
+  if (!appActive) return;
   if (!context) {
     const AudioContext = window.AudioContext ?? window.webkitAudioContext;
     if (!AudioContext) return;
@@ -155,6 +157,13 @@ export function unlockAudio() {
     resuming = true;
     void context.resume().then(startAudio).catch(() => {}).finally(() => { resuming = false; });
   }
+}
+
+export function setAudioActive(active) {
+  appActive = active;
+  if (!context) return;
+  if (active) unlockAudio();
+  else void context.suspend().catch(() => {});
 }
 
 export function effect(name, cooldown = 60, pan = 0) {

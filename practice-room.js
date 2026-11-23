@@ -68,6 +68,7 @@ export async function openPractice(nickname, onMessage) {
 
   return {
     sessionId: client.sessionId,
+    ping: 0,
     now: () => performance.now(),
     start() {
       room.onCreate();

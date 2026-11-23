@@ -8,7 +8,7 @@ const DIRECTIONS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 const EPSILON = 0.000001;
 const POSITION_PRECISION = 100000;
 
-// Godot stores Vector2 components as float32. Use the same position precision on both sides.
+// Keep position rounding consistent between the server and browser prediction.
 function result(position          , direction        )           {
   return {
     x: Math.round(position.x * POSITION_PRECISION) / POSITION_PRECISION,

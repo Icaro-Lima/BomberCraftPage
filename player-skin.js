@@ -1,3 +1,4 @@
+import { localizedText } from "./i18n.js";
 import { hasSkinSignature, PLAYER_PARTS, playerColors, SKIN_V1, SKIN_V1_RGBA_BYTES } from "./player-model.js";
 import { wirePlayerViewer } from "./player-viewer.js";
 import { convertMinecraftSkin, minecraftSkinLayout } from "./minecraft-skin.js";
@@ -193,7 +194,7 @@ export function wirePlayerSkin(dialog, onChange) {
       const skin = await decodeSkin(storedPng(saved));
       if (generation === 0) showSkin(skin);
     } catch {
-      if (generation === 0) status.textContent = "The saved skin could not be loaded.";
+      if (generation === 0) localizedText(status, "The saved skin could not be loaded.");
     }
   })();
 
@@ -208,7 +209,7 @@ export function wirePlayerSkin(dialog, onChange) {
     input.value = "";
     if (!file) return;
     const current = ++generation;
-    status.textContent = "Reading skin…";
+    localizedText(status, "Reading skin…");
     try {
       const skin = await decodeSkin(file, input.dataset.skinFile);
       const saved = await dataUrl(skin.file);
@@ -216,12 +217,12 @@ export function wirePlayerSkin(dialog, onChange) {
       showSkin(skin);
       try {
         localStorage.setItem(storageKey, saved);
-        status.textContent = "Skin applied and saved in this browser.";
+        localizedText(status, "Skin applied and saved in this browser.");
       } catch {
-        status.textContent = "Skin applied for this session. Browser storage is unavailable.";
+        localizedText(status, "Skin applied for this session. Browser storage is unavailable.");
       }
     } catch (error) {
-      if (current === generation) status.textContent = error.message;
+      if (current === generation) localizedText(status, error.message);
     }
   }
 
@@ -229,7 +230,7 @@ export function wirePlayerSkin(dialog, onChange) {
     const skin = selected;
     const png = skin?.file ?? await canvasPng(defaultSkin(0).sheet);
     if (!png) {
-      status.textContent = "The skin could not be exported.";
+      localizedText(status, "The skin could not be exported.");
       return;
     }
     const download = document.createElement("a");
@@ -247,9 +248,9 @@ export function wirePlayerSkin(dialog, onChange) {
     showSkin();
     try {
       localStorage.removeItem(storageKey);
-      status.textContent = "Default skin restored.";
+      localizedText(status, "Default skin restored.");
     } catch {
-      status.textContent = "Default skin restored for this session.";
+      localizedText(status, "Default skin restored for this session.");
     }
   });
 }

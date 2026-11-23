@@ -1,22 +1,35 @@
-import { effect, setMusic, unlockAudio, wireAudio } from "./audio.js";
+import { localizedText, localizedAttribute, wireLanguageSettings, refreshDetectedLanguage } from "./i18n.js";
+import { effect, setAudioActive, setMusic, unlockAudio, wireAudio } from "./audio.js";
 import { inputPayload, Message, openParty } from "./connection.js";
 import { openPractice } from "./practice-room.js";
 import { CRATE_DEBRIS_MS, makePreview, makeRenderer } from "./renderer.js";
 import { playerColors } from "./player-model.js";
 import { defaultSkin, roomSkinFaces, wirePlayerSkin } from "./player-skin.js";
 import { wireJoystick } from "./touch-joystick.js";
+import { wireButtonFeedback } from "./button-feedback.js";
+import { wireHomeKeyboard } from "./home-keyboard.js";
+import { isNativeApp, wireNativeApp } from "./native.js";
+import { defaultServer } from "./server-endpoint.js";
+import { createFrameMeter } from "./frame-meter.js";
 import arena from "./rules/arena.js";
 import { isBorderLane } from "./rules/combat.js";
 import { INPUT_STEP_MS, movePlayer, NO_DIRECTION } from "./rules/movement.js";
 
 const $ = (id) => document.getElementById(id);
+wireButtonFeedback();
+wireHomeKeyboard();
+wireLanguageSettings();
 const controls = $("help-dialog");
 const sound = $("sound-dialog");
 const skinSettings = $("skin-dialog");
+const connectionSettings = $("connection-dialog");
+const connectionStatus = $("connection-status-dialog");
+const languageSettings = $("language-dialog");
 const screens = ["home", "lobby", "game", "results"];
 const HURRY_WARNING_MS = 3000;
 const LATE_MUSIC_REMAINING_MS = 60_000;
 const render = makeRenderer($("arena"));
+const frameMeter = createFrameMeter();
 const width = arena.rows[0].length;
 const depth = arena.rows.length;
 const arenaPan = (x = (width - 1) / 2) => .7 * (2 * x / (width - 1) - 1);
@@ -58,6 +71,7 @@ let lastTimerSecond = -1;
 const pressed = new Map();
 const fuseTicks = new Map();
 let resetJoystick;
+let copyCodeTimeout;
 
 let localSkin;
 const remoteSkins = new Map();
@@ -77,26 +91,62 @@ function showScreen(next) {
   if (controls.open) controls.close();
   if (sound.open) sound.close();
   if (skinSettings.open) skinSettings.close();
+  if (connectionSettings.open) connectionSettings.close();
+  if (languageSettings.open) languageSettings.close();
   $("round-clock").hidden = next !== "game";
   document.body.dataset.screen = next;
   screen = next;
+  resetFrameMeter();
   clearControls();
   if (next === "game") $("arena").focus({ preventScroll: true });
 }
 
 function text(id, value) {
   const node = $(id);
+  node.removeAttribute("data-i18n");
+  node.removeAttribute("data-i18n-values");
   if (node.textContent !== String(value)) node.textContent = value;
 }
 
-function status(message = "") {
-  text("status", message);
-  $("status").hidden = !message;
+function say(id, message, values = {}) {
+  localizedText($(id), message, values);
+}
+
+function metric(value, prefix = "") {
+  return Number.isFinite(value) ? `${prefix}${Math.round(value)}` : "—";
+}
+
+$("fps-toggle").addEventListener("click", () => {
+  const maximum = $("fps-max");
+  maximum.hidden = !maximum.hidden;
+  $("fps-toggle").setAttribute("aria-expanded", String(!maximum.hidden));
+  localizedAttribute($("fps-toggle"), "aria-label", maximum.hidden ? "Show maximum FPS" : "Hide maximum FPS");
+});
+
+function resetFrameMeter() {
+  frameMeter.reset();
+  text("fps-current", "—");
+  text("fps-capacity", "—");
+  text("ping", metric(room?.ping));
+}
+
+function status(message = "", pending = false) {
+  say("status", message);
+  say("connection-status-title", pending ? "Connecting…" : "Unable to connect");
+  say("cancel", pending ? "Cancel" : "OK");
+  connectionStatus.dataset.pending = String(pending);
+  if (message) {
+    if (!connectionStatus.open) connectionStatus.showModal();
+  } else if (connectionStatus.open) connectionStatus.close();
+}
+
+function dismissConnectionStatus() {
+  if (connectionStatus.dataset.pending === "true") leave();
+  else status();
 }
 
 function setBusy(busy) {
   for (const id of ["create", "join", "practice", "nickname", "code", "endpoint"]) $(id).disabled = busy;
-  $("cancel").hidden = !busy;
 }
 
 function resetRound(roundId) {
@@ -142,15 +192,15 @@ async function connect(mode) {
   if (request) return;
   const code = mode === "join" ? $("code").value.trim() : "";
   if (mode === "join" && !code) {
-    status("Enter the room code you want to join.");
     $("code").focus();
+    status("Enter the room code you want to join.");
     return;
   }
   const operation = new AbortController();
   request = operation;
   practice = mode === "practice";
   setBusy(true);
-  status(practice ? "Loading arena…" : code ? "Joining room…" : "Creating room…");
+  status(practice ? "Loading arena…" : code ? "Joining room…" : "Creating room…", true);
   const nickname = $("nickname").value.trim();
 
   try {
@@ -208,8 +258,6 @@ function updateLobby(state) {
       effect("start");
       setMusic("battle");
       displayTime = state.roundEndsAt - 120_000;
-      text("round-label", `ROUND ${state.roundNumber}`);
-      text("game-mode", practice ? "Solo practice" : "Party match");
       text("fire", 1);
       text("bombs", 1);
       text("speed", 0);
@@ -228,9 +276,12 @@ function updateLobby(state) {
       clearControls();
       const winner = state.results.standings.find(({ id }) => id === state.results.winnerId);
       if (winner) {
-        $("round-notice").replaceChildren(playerPortrait(winner), document.createTextNode(`${winner.name} wins!`));
+        const message = document.createElement("span");
+        localizedText(message, "{name} wins!", { name: winner.name });
+        text("round-notice", "");
+        $("round-notice").replaceChildren(playerPortrait(winner), message);
       } else {
-        text("round-notice", practice ? "Practice complete" : "Round draw");
+        say("round-notice", practice ? "Practice complete" : "Round draw");
       }
       $("round-notice").hidden = false;
     }
@@ -277,39 +328,81 @@ function refreshPortraits() {
 function listPlayers(state) {
   const self = state.players.find(({ id }) => id === room.sessionId);
   const isHost = state.hostId === room.sessionId;
+  const readyCount = state.players.filter(({ ready }) => ready).length;
   const allReady = state.players.length > 0 && state.players.every(({ ready }) => ready);
-  $("room-code").value = state.roomId;
-  text("player-count", `${state.players.length} / ${arena.spawns.length} players`);
+  text("room-code", state.roomId);
+  localizedAttribute($("copy-code"), "aria-label", "Copy party code {code}", { code: state.roomId });
+  text("player-count", `${state.players.length} / ${arena.spawns.length}`);
+  say("ready-count", "{ready} of {total} ready", { ready: readyCount, total: state.players.length });
+  $("ready-progress").max = Math.max(1, state.players.length);
+  $("ready-progress").value = readyCount;
+  localizedAttribute($("ready-progress"), "aria-valuetext", "{ready} of {total} players ready", { ready: readyCount, total: state.players.length });
+  $("lobby").dataset.allReady = String(allReady);
   const slots = arena.spawns.map((_, slot) => {
     const entry = state.players.find((player) => player.slot === slot);
     const item = document.createElement("li");
     const name = document.createElement("strong");
-    const tags = document.createElement("small");
+    const tags = document.createElement("div");
+    tags.className = "player-tags";
+    item.className = "slot-card";
+    item.classList.toggle("is-empty", !entry);
+    item.classList.toggle("is-ready", !!entry?.ready);
+    item.classList.toggle("is-self", entry?.id === room.sessionId);
     if (entry) item.style.setProperty("--slot", playerColors[slot]);
-    name.textContent = entry?.name ?? "Open slot";
-    tags.textContent = entry ? [
-      entry.id === state.hostId && "HOST",
-      entry.id === room.sessionId && "YOU",
-      entry.ready ? "READY" : "WAITING",
-    ].filter(Boolean).join(" · ") : "\u00a0";
+    if (entry) name.textContent = entry.name;
+    else localizedText(name, "Open slot");
+    if (entry) name.title = entry.name;
+    else localizedAttribute(name, "title", "Open slot");
+    if (entry) {
+      for (const [show, label, role] of [
+        [entry.id === state.hostId, "Host", "host"],
+        [entry.id === room.sessionId, "You", "self"],
+      ]) {
+        if (!show) continue;
+        const badge = document.createElement("span");
+        badge.className = `player-badge ${role}`;
+        localizedText(badge, label);
+        tags.append(badge);
+      }
+    } else {
+      localizedText(tags, "Invite a friend");
+    }
     const details = document.createElement("div");
     details.className = "player-details";
     details.append(name, tags);
     if (entry) item.append(playerPortrait(entry));
+    else {
+      const placeholder = document.createElement("span");
+      placeholder.className = "empty-avatar";
+      placeholder.setAttribute("aria-hidden", "true");
+      item.append(placeholder);
+    }
     item.append(details);
+    if (entry) {
+      const readiness = document.createElement("span");
+      readiness.className = "player-ready";
+      localizedText(readiness, entry.ready ? "✓ Ready" : "Not ready");
+      item.append(readiness);
+    }
     return item;
   });
-  $("slots").replaceChildren(...slots);
+  const roster = $("slots");
+  const rosterScroll = roster.scrollTop;
+  roster.replaceChildren(...slots);
+  roster.scrollTop = rosterScroll;
   $("ready").disabled = !self;
   $("ready").dataset.ready = String(!!self?.ready);
-  $("ready").classList.toggle("coral", !!self?.ready);
-  $("ready").classList.toggle("green", !self?.ready);
-  text("ready", self?.ready ? "Not ready" : "Ready up");
+  $("ready").setAttribute("aria-pressed", String(!!self?.ready));
+  $("ready").classList.toggle("green", !!self?.ready);
+  $("ready").classList.toggle("violet", !self?.ready);
+  localizedAttribute($("ready"), "title", self?.ready ? "Change to not ready" : "Mark yourself ready to play");
+  say("ready", self?.ready ? "✓ Ready" : "Ready up");
   $("start").hidden = !isHost;
   $("start").disabled = !allReady;
-  text("lobby-hint", isHost
-    ? allReady ? "Everyone is ready. Start when you like." : "All players need to ready up."
-    : "Ready up, then wait for the host to start.");
+  say("lobby-hint", isHost
+    ? allReady ? "Everyone is ready. Start the game!" : "Everyone needs to be ready before you can start."
+    : !self?.ready ? "Ready up when you're set to play."
+      : allReady ? "Everyone is ready. Waiting for the host." : "You're ready. Waiting for the other players.");
 }
 
 function trophy(filled) {
@@ -319,11 +412,13 @@ function trophy(filled) {
 }
 
 function showResults(result) {
+  $("results").dataset.playerCount = String(result.standings.length);
   const champion = result.championId !== null;
   const winner = result.standings.find(({ id }) => id === (result.championId ?? result.winnerId));
-  text("results-title", champion ? "Match champion!" : `Round ${result.roundNumber} results`);
-  text("winner", winner ? winner.name : practice ? "Practice complete" : "Draw");
-  text("result-summary", winner ? champion ? "Three round wins" : "Round winner"
+  say("results-title", champion ? "Match champion!" : "Round {round} results", { round: result.roundNumber });
+  if (winner) text("winner", winner.name);
+  else say("winner", practice ? "Practice complete" : "Draw");
+  say("result-summary", winner ? champion ? "Three round wins" : "Round winner"
     : practice ? "Solo practice" : "No trophy this round");
   $("hero-trophy").replaceChildren(...(winner ? [playerPortrait(winner, true), trophy(true)] : []));
   $("standings").replaceChildren(...result.standings.map((entry) => {
@@ -331,14 +426,16 @@ function showResults(result) {
     const name = document.createElement("strong");
     const trophies = document.createElement("span");
     name.textContent = entry.name;
+    name.title = entry.name;
     row.style.setProperty("--slot", playerColors[entry.slot]);
     if (entry.id === result.winnerId) row.classList.add("awarded");
     trophies.className = "trophies";
-    trophies.setAttribute("aria-label", `${entry.trophies} of 3 trophies`);
+    localizedAttribute(trophies, "aria-label", "{count} of 3 trophies", { count: entry.trophies });
     for (let index = 0; index < 3; index++) trophies.append(trophy(index < entry.trophies));
     row.append(playerPortrait(entry), name, trophies);
     return row;
   }));
+  $("standings").scrollTop = 0;
   $("retry").hidden = !practice;
 }
 
@@ -489,7 +586,7 @@ function releaseDirection(key, cancelled = false) {
 }
 
 function activeGame() {
-  return screen === "game" && lobby?.playing && !controls.open && !sound.open && !skinSettings.open;
+  return screen === "game" && lobby?.playing && !controls.open && !sound.open && !skinSettings.open && !languageSettings.open;
 }
 
 function step(now) {
@@ -556,12 +653,12 @@ function updateArena(now, elapsed) {
     const notice = $("round-notice");
     const showWarning = displayTime >= suddenDeathStartsAt - HURRY_WARNING_MS && !hurry;
     if (showWarning && notice.hidden) {
-      text("round-notice", "HURRY UP!");
+      say("round-notice", "HURRY UP!");
       effect("hurry_alert");
     }
     notice.hidden = !showWarning;
   }
-  text("game-hint", local?.alive === false && !hurry ? "Steer your boat · Space to throw TNT"
+  say("game-hint", local?.alive === false && !hurry ? "Steer your boat · Space to throw TNT"
     : !local && hurry ? "Spectating · Sudden death" : "WASD / Arrows to move · Space for TNT");
 
   updateFalling(Math.min(stoppedAt, now));
@@ -599,6 +696,7 @@ function updateArena(now, elapsed) {
   }
   const players = remotePlayers(now);
   if (local) players.push({ ...local, skin: localSkin?.faces });
+  const drawStartedAt = performance.now();
   render({
     self: room.sessionId,
     players: players.filter((player) => player.alive || (playing && !hurry)),
@@ -610,28 +708,61 @@ function updateArena(now, elapsed) {
     deaths,
     falling: falling.slice(0, fallIndex + (playing && hurry ? 3 : 0)),
   }, now);
+  return performance.now() - drawStartedAt;
 }
 
 function frame(now) {
   const elapsed = Math.min(85, now - tickAt);
   tickAt = now;
-  if (room && lobby && screen === "game") updateArena(room.now(), elapsed);
+  if (room && lobby && screen === "game") {
+    const drawingMs = updateArena(room.now(), elapsed);
+    if (room && screen === "game") {
+      const sample = frameMeter.sample(now, drawingMs);
+      if (sample) {
+        text("fps-current", metric(sample.fps));
+        text("fps-capacity", metric(sample.estimatedFps, "~"));
+        text("ping", metric(room.ping));
+      }
+    }
+  }
   if (room && lobby?.results && screen === "results") {
     const result = lobby.results;
-    const next = result.championId || lobby.players.length < 2 ? "Returning to lobby" : "Next round";
+    const next = result.championId || lobby.players.length < 2 ? "Returning to lobby in {seconds}" : "Next round in {seconds}";
     const remaining = Math.max(0, Math.ceil((result.countdownEndsAt - room.now()) / 1000));
-    text("results-countdown", `${practice ? "Returning to menu" : next} in ${remaining}`);
+    say("results-countdown", practice ? "Returning to menu in {seconds}" : next, { seconds: remaining });
   }
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 
 const initialParams = new URLSearchParams(location.search);
-$("endpoint").value = initialParams.get("server") ??
-  (["localhost", "127.0.0.1"].includes(location.hostname)
-    ? "http://127.0.0.1:2567"
-    : "https://vps73608.publiccloud.com.br");
+$("endpoint").value = defaultServer(location, isNativeApp);
 $("code").value = initialParams.get("room") ?? "";
+
+void wireNativeApp({
+  onStateChange(isActive) {
+    clearControls();
+    accumulator = 0;
+    tickAt = performance.now();
+    resetFrameMeter();
+    setAudioActive(isActive);
+    if (isActive) refreshDetectedLanguage();
+  },
+  onBack() {
+    for (const dialog of [connectionStatus, controls, sound, skinSettings, connectionSettings, languageSettings]) {
+      if (dialog.open) {
+        if (dialog === connectionStatus) dismissConnectionStatus();
+        else dialog.close();
+        return true;
+      }
+    }
+    if (screen !== "home" || request) {
+      leave();
+      return true;
+    }
+    return false;
+  },
+}).catch((error) => console.warn("Could not initialize native app events", error));
 
 $("room-form").addEventListener("submit", (event) => {
   event.preventDefault();
@@ -647,27 +778,54 @@ $("retry").addEventListener("click", () => {
   leave();
   void connect("practice");
 });
-$("cancel").addEventListener("click", () => leave());
+$("cancel").addEventListener("click", dismissConnectionStatus);
+connectionStatus.addEventListener("cancel", (event) => {
+  event.preventDefault();
+  dismissConnectionStatus();
+});
 $("ready").addEventListener("click", () =>
   room?.send(Message.ready, Uint8Array.of($("ready").dataset.ready === "true" ? 0 : 1)));
 $("start").addEventListener("click", () => room?.send(Message.start));
 $("copy-code").addEventListener("click", async () => {
+  const code = $("room-code").textContent;
   try {
-    await navigator.clipboard.writeText($("room-code").value);
+    await navigator.clipboard.writeText(code);
   } catch {
-    $("room-code").select();
-    if (!document.execCommand("copy")) {
-      text("lobby-hint", "Select and copy the room code.");
+    const field = document.createElement("textarea");
+    field.value = code;
+    field.readOnly = true;
+    field.style.cssText = "position:fixed;opacity:0;pointer-events:none";
+    document.body.append(field);
+    let copied = false;
+    try {
+      field.focus({ preventScroll: true });
+      field.select();
+      copied = document.execCommand("copy");
+    } catch {
+      // Some browsers disable both clipboard APIs.
+    } finally {
+      field.remove();
+      $("copy-code").focus({ preventScroll: true });
+    }
+    if (!copied) {
+      say("code-copy-status", "Could not copy the party code.");
+      say("lobby-hint", "Could not copy. Try selecting the party code to copy it.");
       return;
     }
   }
-  text("copy-code", "Copied");
-  setTimeout(() => text("copy-code", "Copy"), 1350);
+  clearTimeout(copyCodeTimeout);
+  say("party-code-label", "Copied!");
+  say("code-copy-status", "Party code copied.");
+  copyCodeTimeout = setTimeout(() => {
+    say("party-code-label", "Party code:");
+    say("code-copy-status", "");
+  }, 1350);
 });
 
 for (const button of document.querySelectorAll("[data-leave]")) button.addEventListener("click", () => leave());
 for (const [selector, dialog] of [
   ["[data-help]", controls], ["[data-sound]", sound], ["[data-skin]", skinSettings],
+  ["[data-connection]", connectionSettings], ["[data-language]", languageSettings],
 ]) {
   dialog.addEventListener("close", () => {
     if (screen === "game") $("arena").focus({ preventScroll: true });
@@ -677,6 +835,11 @@ for (const [selector, dialog] of [
     dialog.showModal();
   });
 }
+
+$("game").addEventListener("click", (event) => {
+  // Non-modal HUD actions hand keyboard control back to the arena.
+  if (event.target.closest("button") && activeGame()) $("arena").focus({ preventScroll: true });
+});
 
 window.addEventListener("keydown", (event) => {
   unlockAudio();
@@ -695,6 +858,7 @@ window.addEventListener("blur", clearControls);
 document.addEventListener("visibilitychange", () => {
   clearControls();
   accumulator = 0;
+  resetFrameMeter();
 });
 document.addEventListener("pointerdown", unlockAudio);
 document.addEventListener("click", (event) => {
@@ -714,5 +878,12 @@ resetJoystick = wireJoystick($("joystick"), activeGame, (directions) => {
   // Insert the preferred direction last, as with the keyboard's key ordering.
   for (const direction of [...directions].reverse()) pressDirection(`joystick-${direction}`, direction);
 });
-$("touch-tnt").addEventListener("pointerdown", () => { if (activeGame()) place = true; });
+for (const name of ["contextmenu", "selectstart"]) {
+  document.querySelector(".touch-controls").addEventListener(name, (event) => event.preventDefault());
+}
+$("touch-tnt").addEventListener("pointerdown", (event) => {
+  if (!activeGame() || event.button !== 0) return;
+  event.preventDefault();
+  place = true;
+});
 $("touch-tnt").addEventListener("click", (event) => { if (event.detail === 0 && activeGame()) place = true; });
