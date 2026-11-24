@@ -2,6 +2,7 @@ import { localizedText } from "./i18n.js";
 import { hasSkinSignature, PLAYER_PARTS, playerColors, SKIN_V1, SKIN_V1_RGBA_BYTES } from "./player-model.js";
 import { wirePlayerViewer } from "./player-viewer.js";
 import { convertMinecraftSkin, minecraftSkinLayout } from "./minecraft-skin.js";
+import { builtInSkins, createBuiltInSkin } from "./built-in-skins.js";
 
 const storageKey = "bombercraft.player-skin.v1";
 const maxPngBytes = 1024 * 1024;
@@ -97,6 +98,33 @@ const defaultSkins = playerColors.map((shirt) => {
   return { sheet, faces: splitFaces(sheet) };
 });
 
+const presets = builtInSkins.map((definition) => {
+  const pixels = createBuiltInSkin(definition.id);
+  const sheet = makeCanvas(pixels.width, pixels.height);
+  const ctx = sheet.getContext("2d");
+  const image = ctx.createImageData(pixels.width, pixels.height);
+  image.data.set(pixels.data);
+  ctx.putImageData(image, 0, 0);
+  return { ...definition, sheet, pixels: pixels.data };
+});
+
+function identifyPreset(sheet) {
+  const pixels = sheet.getContext("2d").getImageData(0, 0, sheet.width, sheet.height).data;
+  return presets.find((preset) => preset.pixels.every((value, index) => value === pixels[index]));
+}
+
+function drawSkinThumbnail(canvas, sheet) {
+  const ctx = canvas.getContext("2d");
+  ctx.imageSmoothingEnabled = false;
+  // A front-facing paper doll uses the same pixels as the 3D player.
+  const placements = [[5, 1], [6, 8], [3, 8], [14, 8], [6, 17], [11, 17]];
+  PLAYER_PARTS.forEach((part, index) => {
+    const [x, y] = placements[index];
+    const [u, v, w, h] = part.faces.front;
+    ctx.drawImage(sheet, u, v, w, h, x * 2, y * 2, w * 2, h * 2);
+  });
+}
+
 export function defaultSkin(slot) {
   return defaultSkins[slot];
 }
@@ -172,6 +200,8 @@ export function wirePlayerSkin(dialog, onChange) {
   const status = dialog.querySelector("[role=status]");
   const exportButton = dialog.querySelector("[data-export-skin]");
   const resetButton = dialog.querySelector("[data-reset-skin]");
+  const gallery = dialog.querySelector(".skin-gallery");
+  const currentName = dialog.querySelector("[data-current-skin]");
   let selected;
   let generation = 0;
 
@@ -183,7 +213,38 @@ export function wirePlayerSkin(dialog, onChange) {
     ctx.drawImage(displayedSkin.sheet, 0, 0);
     updateViewer(displayedSkin.faces);
     resetButton.disabled = !skin;
+    const preset = skin ? identifyPreset(skin.sheet) : null;
+    localizedText(currentName, preset?.name ?? (skin ? "Imported skin" : "Default"));
+    for (const button of gallery.querySelectorAll("[data-builtin-skin]")) {
+      button.setAttribute("aria-pressed", String(button.dataset.builtinSkin === preset?.id));
+    }
     onChange(skin);
+  }
+
+  for (const preset of presets) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "skin-option";
+    button.dataset.builtinSkin = preset.id;
+    button.setAttribute("aria-pressed", "false");
+    const canvas = makeCanvas(40, 52);
+    canvas.setAttribute("aria-hidden", "true");
+    drawSkinThumbnail(canvas, preset.sheet);
+    const label = document.createElement("span");
+    localizedText(label, preset.name);
+    button.append(canvas, label);
+    button.addEventListener("click", () => {
+      generation++;
+      const skin = { sheet: preset.sheet, faces: splitFaces(preset.sheet) };
+      showSkin(skin);
+      try {
+        localStorage.setItem(storageKey, preset.sheet.toDataURL("image/png"));
+        localizedText(status, "Skin applied and saved in this browser.");
+      } catch {
+        localizedText(status, "Skin applied for this session. Browser storage is unavailable.");
+      }
+    });
+    gallery.append(button);
   }
 
   showSkin();
@@ -228,7 +289,7 @@ export function wirePlayerSkin(dialog, onChange) {
 
   exportButton.addEventListener("click", async () => {
     const skin = selected;
-    const png = skin?.file ?? await canvasPng(defaultSkin(0).sheet);
+    const png = skin?.file ?? await canvasPng(skin?.sheet ?? defaultSkin(0).sheet);
     if (!png) {
       localizedText(status, "The skin could not be exported.");
       return;

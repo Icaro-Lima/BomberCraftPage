@@ -207,7 +207,7 @@
     <form method="dialog">
       <div class="panel-header"><h2 id="skin-title" data-i18n="Player skin">Player skin</h2><button class="button cream small" aria-label="Close player skin" data-i18n="Done" data-i18n-aria-label="Close player skin">Done</button></div>
       <div class="skin-layout dialog-body">
-        <section aria-label="3D player preview" data-i18n-aria-label="3D player preview">
+        <section class="skin-model-panel" aria-label="3D player preview" data-i18n-aria-label="3D player preview">
           <canvas class="player-viewer" width="480" height="380" tabindex="0" aria-label="Rotatable player model" aria-describedby="player-viewer-help" data-i18n-aria-label="Rotatable player model"></canvas>
           <p id="player-viewer-help" class="muted viewer-help" data-i18n="Drag or use arrow keys to rotate. Scroll or use the slider to zoom.">Drag or use arrow keys to rotate. Scroll or use the slider to zoom.</p>
           <div class="viewer-controls">
@@ -215,22 +215,28 @@
             <button class="button cream small" type="button" data-viewer-reset data-i18n="Reset view">Reset view</button>
           </div>
         </section>
-        <section class="skin-sheet" aria-label="PNG texture" data-i18n-aria-label="PNG texture">
-          <h3 data-i18n="PNG texture">PNG texture</h3>
-          <canvas class="skin-preview" width="64" height="32" aria-label="Player skin texture" data-i18n-aria-label="Player skin texture"></canvas>
-          <p data-i18n="Exports use BomberCraft’s 64 × 32 format. Keep the four marked pixels intact when editing.">Exports use BomberCraft’s 64 × 32 format. Keep the four marked pixels intact when editing.</p>
-          <div class="skin-actions">
-            <button class="button violet" type="button" data-import-skin="bombercraft" data-i18n="Import PNG">Import PNG</button>
-            <button class="button gold" type="button" data-export-skin data-i18n="Export PNG">Export PNG</button>
-          </div>
-          <div class="skin-actions skin-actions-secondary">
-            <button class="button violet" type="button" data-import-skin="minecraft" data-i18n="Import Minecraft Skin">Import Minecraft Skin</button>
-            <button class="button cream" type="button" data-reset-skin data-i18n="Restore default">Restore default</button>
-          </div>
-          <input type="file" accept="image/png,.png" data-skin-file="bombercraft" aria-label="Select BomberCraft skin PNG" hidden data-i18n-aria-label="Select BomberCraft skin PNG">
-          <input type="file" accept="image/png,.png" data-skin-file="minecraft" aria-label="Select Minecraft skin PNG" hidden data-i18n-aria-label="Select Minecraft skin PNG">
-          <p class="muted" role="status"></p>
-          <p class="muted skin-import-note" data-i18n="Import skins you have permission to use. BomberCraft is independent of Mojang and Microsoft.">Import skins you have permission to use. BomberCraft is independent of Mojang and Microsoft.</p>
+        <section class="skin-sheet" aria-label="Choose a skin" data-i18n-aria-label="Choose a skin">
+          <h3 data-i18n="Built-in skins">Built-in skins</h3>
+          <div class="skin-gallery" role="group" aria-label="Built-in skins" data-i18n-aria-label="Built-in skins"></div>
+          <p class="skin-current"><span data-i18n="Selected skin:">Selected skin:</span> <strong data-current-skin></strong></p>
+          <button class="button cream small" type="button" data-reset-skin data-i18n="Restore default">Restore default</button>
+          <p class="muted skin-status" role="status"></p>
+          <details class="skin-custom">
+            <summary data-i18n="Import / export PNG">Import / export PNG</summary>
+            <h3 data-i18n="PNG texture">PNG texture</h3>
+            <canvas class="skin-preview" width="64" height="32" aria-label="Player skin texture" data-i18n-aria-label="Player skin texture"></canvas>
+            <p data-i18n="Exports use BomberCraft’s 64 × 32 format. Keep the four marked pixels intact when editing.">Exports use BomberCraft’s 64 × 32 format. Keep the four marked pixels intact when editing.</p>
+            <div class="skin-actions">
+              <button class="button violet" type="button" data-import-skin="bombercraft" data-i18n="Import PNG">Import PNG</button>
+              <button class="button gold" type="button" data-export-skin data-i18n="Export PNG">Export PNG</button>
+            </div>
+            <div class="skin-actions skin-actions-secondary">
+              <button class="button violet" type="button" data-import-skin="minecraft" data-i18n="Import Minecraft Skin">Import Minecraft Skin</button>
+            </div>
+            <input type="file" accept="image/png,.png" data-skin-file="bombercraft" aria-label="Select BomberCraft skin PNG" hidden data-i18n-aria-label="Select BomberCraft skin PNG">
+            <input type="file" accept="image/png,.png" data-skin-file="minecraft" aria-label="Select Minecraft skin PNG" hidden data-i18n-aria-label="Select Minecraft skin PNG">
+            <p class="muted skin-import-note" data-i18n="Import skins you have permission to use. BomberCraft is independent of Mojang and Microsoft.">Import skins you have permission to use. BomberCraft is independent of Mojang and Microsoft.</p>
+          </details>
         </section>
       </div>
     </form>
